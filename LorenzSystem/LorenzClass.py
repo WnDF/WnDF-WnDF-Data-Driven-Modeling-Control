@@ -23,12 +23,17 @@ class LorenzSystem:
     def set_time_span(self, t_span):
         self.t_span = t_span
 
-    def solve_system(self, dt=0.01):
+    def solve_system(self, dt=0.002):
         if self.initial_conditions is None or self.t_span is None:
             raise ValueError("Initial conditions and time span must be set before solving the system.")
 
-        t_eval = np.arange(self.t_span[0], self.t_span[1], dt)
-        solution = solve_ivp(self.lorenz_equations, self.t_span, self.initial_conditions, args=(), t_eval=t_eval)
+        t_eval = np.arange(self.t_span[0], 
+                            self.t_span[1], dt)
+        solution = solve_ivp(self.lorenz_equations, 
+                             self.t_span, 
+                             self.initial_conditions, 
+                             args=(), 
+                             t_eval=t_eval)
         return solution
 
     def plot_solution(self, solution):
