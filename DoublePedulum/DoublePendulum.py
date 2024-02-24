@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     y0 = [np.pi+0.3, np.pi-0.5, 0, 0]
     t_span = (0, 3)
-    t_eval = np.linspace(0, 3, 10000)
+    t_eval = np.arange(0, 3, 0.001)
 
     df = double_pendulum.simulate(y0, t_span, t_eval)
     print(df)
