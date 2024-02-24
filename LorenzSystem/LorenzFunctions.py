@@ -95,6 +95,7 @@ def plot_ensemble_results(
     model, mean_ensemble, std_ensemble, mean_library_ensemble, std_library_ensemble
 ):
     # Plot results
+    feature_names = ["x", "y", "z"]
     xticknames = model.get_feature_names()
     for i in range(10):
         xticknames[i] = "$" + xticknames[i] + "$"
@@ -136,7 +137,7 @@ def plot_ensemble_results(
     plt.legend(fontsize=16, loc="upper right")
     ax.set_xticks(range(10))
     ax.set_xticklabels(xticknames, verticalalignment="top")
-
+    plt.show()
 
 # Make energy-preserving quadratic constraints for model of size r
 def make_constraints(r):
