@@ -10,9 +10,9 @@ class DoublePendulumnNNModel(torch.nn.Module):
         super().__init__()
 
         self.RANDOM_SEED = 42
-        self.optimizer = ''
-        self.lossfunction = ''
-        self.lr = 0
+        self.optimizer = None
+        self.lossfunction = None
+        self.lr = None
 
         self.dataset_dataframe = pd.DataFrame()
         self.input_train_data = 0
@@ -22,16 +22,24 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
 
         # 2. Create 2 nn.Linear layers capable of handling X and y input and output shapes
-        self.model = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=64),
-                                                torch.nn.ReLU(),
-                                                torch.nn.Linear(in_features=64, out_features=32),
-                                                torch.nn.ReLU(), 
-                                                torch.nn.Linear(in_features=32, out_features=16),
-                                                torch.nn.ReLU(),
-                                                torch.nn.Linear(in_features=16, out_features=4),
-                                                torch.nn.ReLU())
+        self.model = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=1000),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Dropout(0.2),
+                                        torch.nn.Linear(in_features=1000, out_features=200),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Dropout(0.2),
+                                        torch.nn.Linear(in_features=200, out_features=1000),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Dropout(0.2),
+                                        torch.nn.Linear(in_features=1000, out_features=200),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Dropout(0.2),
+                                        torch.nn.Linear(in_features=200, out_features=50),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Dropout(0.2),
+                                        torch.nn.Linear(in_features=50, out_features=4))
         
-    def DpDataGeneration(self, t_stop = 10, dt = 0.001, sim_step_size=2, 
+    def DataGeneration(self, t_stop = 10, dt = 0.001, sim_step_size=2, 
                          m1 = 0.2704, m2 = 0.2056, cg1 = 0.191, cg2 = 0.1621, 
                          L1 = 0.2667, L2 = 0.2667, I1 = 0.003, I2 = 0.0011, g = 9.81):
         
@@ -69,12 +77,43 @@ class DoublePendulumnNNModel(torch.nn.Module):
     def SaveSimulationData(self):
         self.dataset_dataframe.to_csv('DoublePendulumDataset.csv', encoding='utf-8')
     
-    def LossFunction(self, lossfunction = torch.nn.MSELoss):
+    def LossFunction(self, lossfunction = torch.nn.MSELoss()):
         self.lossfunction = lossfunction
 
-    def Optimizer(self, optimizer = torch.optim.Adam, lr = 0.01):
+    def Optimizer(self, optimizer = torch.optim.Adam, lr = 0.001):
         self.optimizer = optimizer(self.model.parameters(), lr = lr)
         self.lr = lr
+
+    def AccuracyFunc(self, y_true, y_pred):
+        correct = torch.eq(y_true, y_pred).sum().item() # torch.eq() calculates where two tensors are equal
+        acc = (correct / len(y_pred)) * 100 
+        return acc
+
+    
+    def Train(self, epochs = 100):
+        np.random.seed(self.RANDOM_SEED)
+
+        for epoch in range(epochs):
+            self.model.train()
+
+            y_preds = self.model(self.input_train_data)
+            loss = self.lossfunction(y_preds, self.output_train_data)
+            accuracy = self.AccuracyFunc(y_true = self.output_train_data, 
+                                         y_pred = y_preds)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            self.model.eval()
+
+            with torch.inference_mode():
+                test_preds = self.model(self.input_test_data)
+                test_loss = self.lossfunction(test_preds, self.output_test_data)
+                test_acc = self.AccuracyFunc(y_true = self.output_test_data,
+                                            y_pred = test_preds)
+            
+            if epoch % 10 == 0:
+                print(f"Epoch: {epoch} | Loss: {loss:.5f}, Acc: {accuracy:.2f}% | Test Loss: {test_loss:.5f}, Test Acc: {test_acc:.2f}%") 
 
     def DataPlots(self):
         pass
@@ -83,5 +122,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         return self.model(x)
 
 DpNNModel = DoublePendulumnNNModel()
-DpNNModel.Optimizer(optimizer = torch.optim.SGD, lr = 0.00001)
-print(DpNNModel.optimizer)
+DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 5)
+DpNNModel.LossFunction()
+DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
+DpNNModel.Train(epochs = 100)
