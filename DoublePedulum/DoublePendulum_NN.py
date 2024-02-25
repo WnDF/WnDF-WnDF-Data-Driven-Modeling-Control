@@ -8,13 +8,21 @@ from sklearn.model_selection import train_test_split
 class DoublePendulumnNNModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
         self.RANDOM_SEED = 42
+        self.optimizer = ''
+        self.lossfunction = ''
+        self.lr = 0
+
         self.dataset_dataframe = pd.DataFrame()
-        self.train_data = pd.DataFrame()
-        self.test_data = pd.DataFrame()
+        self.input_train_data = 0
+        self.input_test_data = 0
+        self.output_train_data = 0
+        self.output_test_data = 0
+
 
         # 2. Create 2 nn.Linear layers capable of handling X and y input and output shapes
-        self.layer_stack = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=64),
+        self.model = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=64),
                                                 torch.nn.ReLU(),
                                                 torch.nn.Linear(in_features=64, out_features=32),
                                                 torch.nn.ReLU(), 
@@ -47,27 +55,33 @@ class DoublePendulumnNNModel(torch.nn.Module):
             df = double_pendulum.simulate(state, t_span, t_eval)
             self.dataset_dataframe = pd.concat([self.dataset_dataframe, df], axis = 0)
 
-        self.dataset_dataframe.to_csv('DoublePendulumDataset.csv', encoding='utf-8')
-
-        print(self.dataset_dataframe)
         input_data = np.array(self.dataset_dataframe[['Theta1_dot', 'Theta2_dot', 'Omega1_dot', 'Omega2_dot']])
         output_data = np.array(self.dataset_dataframe[['Theta1', 'Theta2', 'Omega1', 'Omega2']])
 
         input_data = torch.from_numpy(input_data).type(torch.float)
         output_data = torch.from_numpy(output_data).type(torch.float)
 
-
-        input_train, input_test, output_train, output_test = train_test_split(input_data,
+        self.input_train_data, self.input_test_data, self.output_train_data, self.output_test_data = train_test_split(input_data,
                                                                               output_data,
                                                                               test_size=0.2,
                                                                               random_state = np.random.seed(self.RANDOM_SEED))
+    
+    def SaveSimulationData(self):
+        self.dataset_dataframe.to_csv('DoublePendulumDataset.csv', encoding='utf-8')
+    
+    def LossFunction(self, lossfunction = torch.nn.MSELoss):
+        self.lossfunction = lossfunction
+
+    def Optimizer(self, optimizer = torch.optim.Adam, lr = 0.01):
+        self.optimizer = optimizer(self.model.parameters(), lr = lr)
+        self.lr = lr
+
     def DataPlots(self):
         pass
 
     def forward(self, x):
-        return self.layer_stack(x)
+        return self.model(x)
 
 DpNNModel = DoublePendulumnNNModel()
-DpNNModel.DpDataGeneration()
-
-    
+DpNNModel.Optimizer(optimizer = torch.optim.SGD, lr = 0.00001)
+print(DpNNModel.optimizer)
