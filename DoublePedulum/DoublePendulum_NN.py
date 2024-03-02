@@ -21,8 +21,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.output_test_data = 0
         self.train_timespan_data = 0
         self.test_timespan_data = 0
-        
         self.prediction_dataframe = pd.DataFrame()
+        self.metricesbyepochs = pd.DataFrame()
 
 
         # 2. Create 2 nn.Linear layers capable of handling X and y input and output shapes
@@ -90,10 +90,14 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.optimizer = optimizer(self.model.parameters(), lr = lr)
         self.lr = lr
 
-    def AccuracyFunc(self, y_true, y_pred):
-        correct = torch.eq(y_true, y_pred).sum().item() # torch.eq() calculates where two tensors are equal
-        acc = (correct / len(y_pred)) * 100 
-        return acc
+    def AccuracyFunc(self, y_true, y_pred, treshold = 0.01):
+        acc_rates = np.empty(1,4)
+        for i in range(0,len(y_true)):
+            error = torch.abs(y_true[i] - y_pred[i])
+            correct = torch.sum(error <= treshold).item()
+            acc = (correct / len(y_true)) * 100
+            acc_rates.append(acc)
+        return acc_rates
 
     def Train(self, epochs = 100):
         np.random.seed(self.RANDOM_SEED)
@@ -115,25 +119,44 @@ class DoublePendulumnNNModel(torch.nn.Module):
                 test_preds = self.model(self.input_test_data)
                 test_loss = self.lossfunction(test_preds, self.output_test_data)
                 test_acc = self.AccuracyFunc(y_true = self.output_test_data,
-                                            y_pred = test_preds)
+                                            y_pred = test_preds,
+                                            treshold = 0.01)
+                
+                dfmetrices = pd.DataFrame({'Epoch': epoch, 'Lr': self.optimizer.param_groups['lr'],
+                                           'Theta1Accuracy': test_acc[0], 'Theta2Accuracy': test_acc[1],
+                                           'Omega1Accuracy': test_acc[2], 'Omega2Accuracy': test_acc[3],
+                                           'TrainLoss': loss, 'TestLoss': test_loss})
+                self.metricesbyepochs = pd.concat([self.metricesbyepochs, dfmetrices], axis = 0)
             
             if epoch % 100 == 0:
-                print(f"Epoch: {epoch} | Loss: {loss:.5f}, Acc: {accuracy:.2f}% | Test Loss: {test_loss:.5f}, Test Acc: {test_acc:.2f}%")
+                print(f"Epoch: {epoch} | Loss: {loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f} | Test Loss: {test_loss:.5f}")
 
+    def DataPlots(self):
         self.model.eval()
 
         with torch.inference_mode():
             predictions = self.model(self.input_test_data).numpy()
-            Theta1 = self.output_test_data[:,0].numpy()
+            self.output_test_data = self.output_test_data.numpy()
+            Theta1 = self.output_test_data[:,0]
             Theta1_pred = predictions[:,0]
-            Theta2 = self.output_test_data[:,1].numpy()
+            Theta2 = self.output_test_data[:,1]
             Theta2_pred = predictions[:,1]
-            Omega1= self.output_test_data[:,2].numpy()
+            Omega1= self.output_test_data[:,2]
             Omega1_pred = predictions[:,2]
-            Omega2 = self.output_test_data[:,3].numpy()
+            Omega2 = self.output_test_data[:,3]
             Omega2_pred = predictions[:,3]
-
             t_span = self.test_timespan_data
+
+            epochs = self.metricesbyepochs['Epoch']
+            TrainLoss = self.metricesbyepochs['TrainLoss']
+            TestLoss = self.metricesbyepochs['TestLoss']
+            lr = self.metricesbyepochs['lr']
+            
+            Theta1Accuracy = self.metricesbyepochs['Theta1Accuracy']
+            Theta2Accuracy = self.metricesbyepochs['Theta2Accuracy']
+            Omega1Accuracy = self.metricesbyepochs['Omega1Accuracy']
+            Omega2Accuracy = self.metricesbyepochs['Omega2Accuracy']
+            
             plt.subplot(2, 2, 1)
             plt.scatter(t_span, Theta1_pred, s=0.3)
             plt.scatter(t_span, Theta1, s=0.3)
@@ -156,22 +179,70 @@ class DoublePendulumnNNModel(torch.nn.Module):
             plt.title('Omega1')
             plt.xlabel('Time')
             plt.ylabel('Omega1-Omega1_pred')
-            plt.legend()
             plt.grid(True)
 
             plt.subplot(2, 2, 4)
-            plt.scatter(t_span,Omega2_pred, s=0.3)
+            plt.scatter(t_span, Omega2_pred, s=0.3)
             plt.scatter(t_span, Omega2, s=0.3)
             plt.title('Omega2')
             plt.xlabel('Time')
             plt.ylabel('Omega2-Omega2_pred')
-            plt.legend()
             plt.grid(True)
 
             plt.show()
 
-    def DataPlots(self):
-        pass
+            plt.subplot(1, 3, 1)
+            plt.scatter(epochs, TestLoss, s = 0.3)
+            plt.title('Test Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.grid(True)
+
+            plt.subplot(1, 3, 2)
+            plt.scatter(epochs, TrainLoss, s = 0.3)
+            plt.title('Train Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.grid(True)
+
+            plt.subplot(1, 3, 3)
+            plt.scatter(epochs, lr, s = 0.3)
+            plt.title('Learning Rate')
+            plt.xlabel('Epoch')
+            plt.ylabel('Lr')
+            plt.grid(True)
+
+            plt.show()
+
+            plt.subplot(2, 2, 1)
+            plt.scatter(epochs, Theta1Accuracy, s = 0.3)
+            plt.title('Theta1 Accuracy')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.grid(True)
+
+            plt.subplot(2, 2, 2)
+            plt.scatter(epochs, Theta2Accuracy, s = 0.3)
+            plt.title('Theta2 Accuracy')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.grid(True)
+
+            plt.subplot(2, 2, 3)
+            plt.scatter(epochs, Omega1Accuracy, s = 0.3)
+            plt.title('Omega1 Accuracy')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.grid(True)
+
+            plt.subplot(2, 2, 4)
+            plt.scatter(epochs, Omega2Accuracy, s = 0.3)
+            plt.title('Omega2 Accuracy')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.grid(True)
+
+            plt.show()
 
     def forward(self, x):
         return self.model(x)
