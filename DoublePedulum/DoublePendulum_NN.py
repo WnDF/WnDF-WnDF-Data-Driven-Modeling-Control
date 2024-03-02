@@ -91,7 +91,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.lr = lr
 
     def AccuracyFunc(self, y_true, y_pred, treshold = 0.01):
-        acc_rates = np.empty(1,4)
+        acc_rates = []
         for i in range(0,len(y_true)):
             error = torch.abs(y_true[i] - y_pred[i])
             correct = torch.sum(error <= treshold).item()
@@ -122,14 +122,14 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                             y_pred = test_preds,
                                             treshold = 0.01)
                 
-                dfmetrices = pd.DataFrame({'Epoch': epoch, 'Lr': self.optimizer.param_groups['lr'],
+                dfmetrices = pd.DataFrame({'Epoch': epoch, 'Lr': [self.optimizer.param_groups[0]['lr']],
                                            'Theta1Accuracy': test_acc[0], 'Theta2Accuracy': test_acc[1],
                                            'Omega1Accuracy': test_acc[2], 'Omega2Accuracy': test_acc[3],
                                            'TrainLoss': loss, 'TestLoss': test_loss})
                 self.metricesbyepochs = pd.concat([self.metricesbyepochs, dfmetrices], axis = 0)
             
-            if epoch % 100 == 0:
-                print(f"Epoch: {epoch} | Loss: {loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f} | Test Loss: {test_loss:.5f}")
+            if epoch % 10 == 0:
+                print(f"Epoch: {epoch} | Loss: {loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Test Loss: {test_loss:.5f}")
 
     def DataPlots(self):
         self.model.eval()
@@ -150,8 +150,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
             epochs = self.metricesbyepochs['Epoch']
             TrainLoss = self.metricesbyepochs['TrainLoss']
             TestLoss = self.metricesbyepochs['TestLoss']
-            lr = self.metricesbyepochs['lr']
-            
+            lr = self.metricesbyepochs['Lr']
+
             Theta1Accuracy = self.metricesbyepochs['Theta1Accuracy']
             Theta2Accuracy = self.metricesbyepochs['Theta2Accuracy']
             Omega1Accuracy = self.metricesbyepochs['Omega1Accuracy']
@@ -192,21 +192,21 @@ class DoublePendulumnNNModel(torch.nn.Module):
             plt.show()
 
             plt.subplot(1, 3, 1)
-            plt.scatter(epochs, TestLoss, s = 0.3)
+            plt.plot(epochs, TestLoss)
             plt.title('Test Loss')
             plt.xlabel('Epoch')
             plt.ylabel('Loss')
             plt.grid(True)
 
             plt.subplot(1, 3, 2)
-            plt.scatter(epochs, TrainLoss, s = 0.3)
+            plt.plot(epochs, TrainLoss)
             plt.title('Train Loss')
             plt.xlabel('Epoch')
             plt.ylabel('Loss')
             plt.grid(True)
 
             plt.subplot(1, 3, 3)
-            plt.scatter(epochs, lr, s = 0.3)
+            plt.plot(epochs, lr)
             plt.title('Learning Rate')
             plt.xlabel('Epoch')
             plt.ylabel('Lr')
@@ -251,4 +251,5 @@ DpNNModel = DoublePendulumnNNModel()
 DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 1)
 DpNNModel.LossFunction()
 DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
-DpNNModel.Train(epochs = 10000)
+DpNNModel.Train(epochs = 50)
+DpNNModel.DataPlots()
