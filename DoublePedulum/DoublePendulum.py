@@ -1,10 +1,11 @@
 import numpy as np
-from scipy.integrate import solve_ivp
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from sklearn.metrics import mean_squared_error
 
 class DoublePendulumSS:
-    def __init__(self, m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81):
+    def __init__(self, m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy = False):
         self.m1 = m1  # mass of pendulum 1
         self.m2 = m2  # mass of pendulum 2
         self.L1 = L1  # length of pendulum 1
@@ -14,6 +15,7 @@ class DoublePendulumSS:
         self.g = g    # acceleration due to gravity
         self.I1 = I1  # inertia of pendulum 1
         self.I2 = I2  # inertia of pendulum 2
+        self.noisy = noisy
 
     def equations_of_motion(self, t, y):
         theta1, theta2, omega1, omega2 = y[:4]
@@ -72,6 +74,11 @@ class DoublePendulumSS:
     def solve(self, y0, t_span, t_eval=None):
         sol = solve_ivp(self.equations_of_motion, t_span, y0, t_eval=t_eval)
         return sol
+    
+    def Noisy_Data_Generation(self, x):
+        rmse = mean_squared_error(x, np.zeros(x.shape), squared=False)
+        x_noisy = x + np.random.normal(0, rmse / 50.0, x.shape)
+        return x_noisy
 
     def simulate(self, y0, t_span, t_eval=None):
         sol = self.solve(y0, t_span, t_eval)
@@ -83,11 +90,17 @@ class DoublePendulumSS:
 
         theta1_dot, theta2_dot = self.equations_of_motion(t, y)[:2]
         omega1_dot, omega2_dot = self.equations_of_motion(t, y)[2:]
+        
+        if self.noisy:  # Add noise if noisy flag is True
+            parameters = [theta1, theta2, omega1, omega2, theta1_dot, theta2_dot, omega1_dot, omega2_dot]
+            # Add noise to each parameter using Noisy_Data_Generation function
+            for i in range(len(parameters)):
+                parameters[i] = self.Noisy_Data_Generation(parameters[i])
 
-        df = pd.DataFrame({'Time': t, 'Theta1': theta1, 'Theta2': theta2,
-                           'Omega1': omega1, 'Omega2': omega2,
-                           'Theta1_dot': theta1_dot, 'Theta2_dot': theta2_dot,
-                           'Omega1_dot': omega1_dot, 'Omega2_dot': omega2_dot})
+        df = pd.DataFrame({'Time': t, 'Theta1': parameters[0], 'Theta2': parameters[1],
+                       'Omega1': parameters[2], 'Omega2': parameters[3],
+                       'Theta1_dot': parameters[4], 'Theta2_dot': parameters[5],
+                       'Omega1_dot': parameters[6], 'Omega2_dot': parameters[7]})
         return df
 
     def plot_outputs(self, df):
@@ -105,7 +118,7 @@ class DoublePendulumSS:
 
 # Example usage:
 if __name__ == "__main__":
-    double_pendulum = DoublePendulumSS(m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81)  # Set parameters
+    double_pendulum = DoublePendulumSS(m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy= True)  # Set parameters
 
     y0 = [np.pi+0.3, np.pi-0.5, 0, 0]
     t_span = (0, 3)
