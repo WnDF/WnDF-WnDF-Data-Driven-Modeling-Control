@@ -14,6 +14,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.lossfunction = None
         self.lr = None
 
+        self.DpModel = ''
         self.dataset_dataframe = pd.DataFrame()
         self.input_train_data = 0
         self.input_test_data = 0
@@ -45,7 +46,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                          L1 = 0.2667, L2 = 0.2667, I1 = 0.003, I2 = 0.0011, g = 9.81):
         
         # create double dendulumn state-space model
-        double_pendulum = dp.DoublePendulumSS(m1, m2, cg1, cg2, L1, L2, I1, I2, g)
+        self.DpModel = dp.DoublePendulumSS(m1, m2, cg1, cg2, L1, L2, I1, I2, g)
         np.random.seed(self.RANDOM_SEED)
 
         for i in range(1, sim_step_size + 1):
@@ -61,10 +62,10 @@ class DoublePendulumnNNModel(torch.nn.Module):
             t_span = (0, t_stop)
             t_eval = np.arange(0, t_stop, dt)
 
-            df = double_pendulum.simulate(state, t_span, t_eval)
+            df = self.DpModel.simulate(state, t_span, t_eval)
             self.dataset_dataframe = pd.concat([self.dataset_dataframe, df], axis = 0)
         
-        self.SaveSimulationData()
+        self.SaveSimulationData(data = self.dataset_dataframe, filename = 'DoublePendulumDataset.cvs')
 
         input_data = np.array(self.dataset_dataframe[['Theta1_dot', 'Theta2_dot', 'Omega1_dot', 'Omega2_dot']])
         output_data = np.array(self.dataset_dataframe[['Theta1', 'Theta2', 'Omega1', 'Omega2']])
@@ -80,8 +81,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                                                                                                                                                         test_size=0.2,
                                                                                                                                                                         random_state = np.random.seed(self.RANDOM_SEED))
     
-    def SaveSimulationData(self):
-        self.dataset_dataframe.to_csv('DoublePendulumDataset.csv', encoding='utf-8')
+    def SaveSimulationData(self, data, filename):
+        data.to_csv(filename, encoding='utf-8')
     
     def LossFunction(self, lossfunction = torch.nn.MSELoss()):
         self.lossfunction = lossfunction
@@ -93,7 +94,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
     def AccuracyFunc(self, y_true, y_pred, treshold = 0.01):
         acc_rates = []
         for i in range(0,len(y_true)):
-            error = torch.abs(y_true[i] - y_pred[i])
+            error = torch.abs((y_true[i] - y_pred[i])/y_pred[i])
             correct = torch.sum(error <= treshold).item()
             acc = (correct / len(y_true)) * 100
             acc_rates.append(acc)
@@ -128,10 +129,26 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                            'TrainLoss': loss, 'TestLoss': test_loss})
                 self.metricesbyepochs = pd.concat([self.metricesbyepochs, dfmetrices], axis = 0)
             
-            if epoch % 10 == 0:
+            if epoch % 100 == 0:
                 print(f"Epoch: {epoch} | Loss: {loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Test Loss: {test_loss:.5f}")
 
-    def DataPlots(self):
+    def PoseByAxis(self, theta1_true, theta1_pred, theta2_true, theta2_pred):
+        x1_true =  self.DpModel.L1*np.sin(theta1_true)
+        y1_true = -self.DpModel.L1*np.cos(theta1_true)
+
+        x2_true = self.DpModel.L2*np.sin(theta2_true) + x1_true
+        y2_true = -self.DpModel.L2*np.cos(theta2_true) + y1_true
+
+        x1_pred = self.DpModel.L1*np.sin(theta1_pred)
+        y1_pred = -self.DpModel.L1*np.cos(theta1_pred)
+
+        x2_pred = self.DpModel.L2*np.sin(theta2_pred) + x1_pred
+        y2_pred = -self.DpModel.L2*np.cos(theta2_pred) + y1_pred
+
+        return x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred
+
+    def ModelEvaluation(self):
+
         self.model.eval()
 
         with torch.inference_mode():
@@ -145,6 +162,44 @@ class DoublePendulumnNNModel(torch.nn.Module):
             Omega1_pred = predictions[:,2]
             Omega2 = self.output_test_data[:,3]
             Omega2_pred = predictions[:,3]
+
+            x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred = self.PoseByAxis(theta1_true = Theta1, 
+                                                                                                     theta1_pred = Theta1_pred, 
+                                                                                                     theta2_true = Theta2, 
+                                                                                                     theta2_pred = Theta2_pred)
+
+            pred_df = pd.DataFrame({'Theta1': Theta1, 'Theta2': Theta2, 
+                                    'Omega1': Omega1, 'Omega2': Omega2, 
+                                    'x1_true': x1_true, 'y1_true': y1_true, 
+                                    'x2_true':x2_true, 'y2_true':y2_true ,
+                                    'Theta1_pred': Theta1_pred, 'Theta2_pred': Theta2_pred, 
+                                    'Omega1_pred': Omega1_pred, 'Omega2_pred': Omega2_pred,
+                                    'x1_pred': x1_pred, 'y1_pred': y1_pred,
+                                    'x2_pred': x2_pred, 'y2_pred': y2_pred
+                                    })
+            
+            self.prediction_dataframe = pd.concat([self.prediction_dataframe, pred_df], axis = 1)
+            self.SaveSimulationData(data = self.prediction_dataframe, filename = 'ModelEval.cvs')
+
+    def DataPlots(self):
+            Theta1 = self.prediction_dataframe['Theta1']
+            Theta2 = self.prediction_dataframe['Theta2']
+            Omega1= self.prediction_dataframe['Omega1']
+            Omega2 = self.prediction_dataframe['Omega2']
+            x1_true = self.prediction_dataframe['x1_true']
+            y1_true = self.prediction_dataframe['y1_true']
+            x2_true = self.prediction_dataframe['x2_true']
+            y2_true = self.prediction_dataframe['y2_true']
+
+            Theta1_pred = self.prediction_dataframe['Theta1_pred']
+            Theta2_pred = self.prediction_dataframe['Theta2_pred']
+            Omega1_pred = self.prediction_dataframe['Omega1_pred']
+            Omega2_pred = self.prediction_dataframe['Omega2_pred']
+            x1_pred = self.prediction_dataframe['x1_pred']
+            y1_pred = self.prediction_dataframe['y1_pred']
+            x2_pred = self.prediction_dataframe['x2_pred']
+            y2_pred =self.prediction_dataframe['y2_pred']
+
             t_span = self.test_timespan_data
 
             epochs = self.metricesbyepochs['Epoch']
@@ -190,6 +245,42 @@ class DoublePendulumnNNModel(torch.nn.Module):
             plt.grid(True)
 
             plt.show()
+            plt.savefig("NNFigures/Angle & Omega Predictions.png")
+            
+            plt.subplot(2, 2, 1)
+            plt.scatter(t_span, x1_true, s=0.3)
+            plt.scatter(t_span, x1_pred, s=0.3)
+            plt.title('First Link X Pose')
+            plt.xlabel('Time')
+            plt.ylabel('x')
+            plt.grid(True)
+
+            plt.subplot(2, 2, 2)
+            plt.scatter(t_span, y1_true, s=0.3)
+            plt.scatter(t_span, y1_pred, s=0.3)
+            plt.title('First Link Y Pose')
+            plt.xlabel('Time')
+            plt.ylabel('y')
+            plt.grid(True)
+
+            plt.subplot(2, 2, 3)
+            plt.scatter(t_span, x2_true, s=0.3)
+            plt.scatter(t_span, x2_pred, s=0.3)
+            plt.title('Second Link X Pose')
+            plt.xlabel('Time')
+            plt.ylabel('x')
+            plt.grid(True)
+
+            plt.subplot(2, 2, 4)
+            plt.scatter(t_span, y2_true, s=0.3)
+            plt.scatter(t_span, y2_pred, s=0.3)
+            plt.title('Second Link Y Pose')
+            plt.xlabel('Time')
+            plt.ylabel('y')
+            plt.grid(True)
+
+            plt.show()
+            plt.savefig("Position of Links.png")
 
             plt.subplot(1, 3, 1)
             plt.plot(epochs, TestLoss)
@@ -213,6 +304,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
             plt.grid(True)
 
             plt.show()
+            plt.savefig("NNFigures/Loss Values & Learning Rate.png")
 
             plt.subplot(2, 2, 1)
             plt.scatter(epochs, Theta1Accuracy, s = 0.3)
@@ -243,6 +335,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
             plt.grid(True)
 
             plt.show()
+            plt.savefig("NNFigures/Predictions Accuracy.png")
 
     def forward(self, x):
         return self.model(x)
@@ -251,5 +344,5 @@ DpNNModel = DoublePendulumnNNModel()
 DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 1)
 DpNNModel.LossFunction()
 DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
-DpNNModel.Train(epochs = 50)
+DpNNModel.Train(epochs = 200)
 DpNNModel.DataPlots()
