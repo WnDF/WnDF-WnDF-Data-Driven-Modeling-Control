@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from sklearn.metrics import mean_squared_error
+import warnings
+warnings.filterwarnings("ignore")
 
 class DoublePendulumSS:
     def __init__(self, m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy = False):
@@ -91,8 +93,9 @@ class DoublePendulumSS:
         theta1_dot, theta2_dot = self.equations_of_motion(t, y)[:2]
         omega1_dot, omega2_dot = self.equations_of_motion(t, y)[2:]
         
+        parameters = [theta1, theta2, omega1, omega2, theta1_dot, theta2_dot, omega1_dot, omega2_dot]
+
         if self.noisy:  # Add noise if noisy flag is True
-            parameters = [theta1, theta2, omega1, omega2, theta1_dot, theta2_dot, omega1_dot, omega2_dot]
             # Add noise to each parameter using Noisy_Data_Generation function
             for i in range(len(parameters)):
                 parameters[i] = self.Noisy_Data_Generation(parameters[i])
