@@ -7,7 +7,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 class DoublePendulumSS:
-    def __init__(self, m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy = False):
+    def __init__(self, m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81,  noisy = bool()):
         self.m1 = m1  # mass of pendulum 1
         self.m2 = m2  # mass of pendulum 2
         self.L1 = L1  # length of pendulum 1
@@ -73,7 +73,7 @@ class DoublePendulumSS:
 
         return [theta1_dot, theta2_dot, omega1_dot, omega2_dot]
 
-    def solve(self, y0, t_span, t_eval=None):
+    def solve(self, y0, t_span, t_eval):
         sol = solve_ivp(self.equations_of_motion, t_span, y0, t_eval=t_eval)
         return sol
     
@@ -82,7 +82,7 @@ class DoublePendulumSS:
         x_noisy = x + np.random.normal(0, rmse / 50.0, x.shape)
         return x_noisy
 
-    def simulate(self, y0, t_span, t_eval=None):
+    def simulate(self, y0, t_span, t_eval):
         sol = self.solve(y0, t_span, t_eval)
         t = sol.t
         y = sol.y
@@ -121,11 +121,11 @@ class DoublePendulumSS:
 
 # Example usage:
 if __name__ == "__main__":
-    double_pendulum = DoublePendulumSS(m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy= True)  # Set parameters
+    double_pendulum = DoublePendulumSS(m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy = True)  # Set parameters
 
     y0 = [np.pi+0.3, np.pi-0.5, 0, 0]
-    t_span = (0, 3)
-    t_eval = np.arange(0, 3, 0.001)
+    t_span = (0, 10)
+    t_eval = np.arange(0, 10, 0.001)
 
     df = double_pendulum.simulate(y0, t_span, t_eval)
     print(df)
