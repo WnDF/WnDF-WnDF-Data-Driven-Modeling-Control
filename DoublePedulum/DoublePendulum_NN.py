@@ -4,7 +4,6 @@ import DoublePendulum as dp
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-import pickle
 
 class DoublePendulumnNNModel(torch.nn.Module):
     def __init__(self):
@@ -15,18 +14,18 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.lossfunction = None
         self.lr = None
 
-        self.DpModel = ''
+        self.DP = None
+        self.is_noisy = None
         self.dataset_dataframe = pd.DataFrame()
-        self.input_train_data = 0
-        self.input_test_data = 0
-        self.output_train_data = 0
-        self.output_test_data = 0
-        self.train_timespan_data = 0
-        self.test_timespan_data = 0
+        self.input_train_data = None
+        self.input_test_data = None
+        self.output_train_data = None
+        self.output_test_data = None
+        self.train_timespan_data = None
+        self.test_timespan_data = None
         self.prediction_dataframe = pd.DataFrame()
         self.metricesbyepochs = pd.DataFrame()
 
-        # 2. Create 2 nn.Linear layers capable of handling X and y input and output shapes
         self.model = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=1024),
                                         torch.nn.ReLU(),
                                         torch.nn.Linear(in_features=1024, out_features=512),
@@ -40,13 +39,18 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                         torch.nn.Linear(in_features=64, out_features=16),
                                         torch.nn.ReLU(),
                                         torch.nn.Linear(in_features=16, out_features=4))
-        
-    def DataGeneration(self, t_stop = 10, dt = 0.001, sim_step_size=2, 
+
+    #NOISE     
+    def DataGeneration(self, noisy, t_stop = 10, dt = 0.001, sim_step_size=2, 
                          m1 = 0.2704, m2 = 0.2056, cg1 = 0.191, cg2 = 0.1621, 
-                         L1 = 0.2667, L2 = 0.2667, I1 = 0.003, I2 = 0.0011, g = 9.81, noisy = False):
+                         L1 = 0.2667, L2 = 0.2667, I1 = 0.003, I2 = 0.0011, g = 9.81):
         
-        # create double dendulumn state-space model
-        self.DpModel = dp.DoublePendulumSS(m1, m2, cg1, cg2, L1, L2, I1, I2, g)
+        if noisy:
+            self.is_noisy = '(Noise = Noisy)'
+        else:
+            self.is_noisy = '(Noise = Normal)'
+        
+        self.DP = dp.DoublePendulumSS(m1, m2, cg1, cg2, L1, L2, I1, I2, g)
         np.random.seed(self.RANDOM_SEED)
 
         for i in range(1, sim_step_size + 1):
@@ -62,10 +66,11 @@ class DoublePendulumnNNModel(torch.nn.Module):
             t_span = (0, t_stop)
             t_eval = np.arange(0, t_stop, dt)
 
-            df = self.DpModel.simulate(state, t_span, t_eval)
+            df = self.DP.simulate(state, t_span, t_eval)
             self.dataset_dataframe = pd.concat([self.dataset_dataframe, df], axis = 0)
         
-        self.SaveSimulationData(data = self.dataset_dataframe, filename = './DoublePedulum/Dataset/DoublePendulumDatasetForNN.csv')
+        #PATH
+        self.SaveSimulationData(data = self.dataset_dataframe, PATH = f'./DoublePedulum/Dataset/DoublePendulumTrainingDataset{self.is_noisy}.csv')
 
         input_data = np.array(self.dataset_dataframe[['Theta1_dot', 'Theta2_dot', 'Omega1_dot', 'Omega2_dot']])
         output_data = np.array(self.dataset_dataframe[['Theta1', 'Theta2', 'Omega1', 'Omega2']])
@@ -81,8 +86,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                                                                                                                                                         test_size=0.2,
                                                                                                                                                                         random_state = np.random.seed(self.RANDOM_SEED))
     
-    def SaveSimulationData(self, data, filename):
-        data.to_csv(filename, encoding='utf-8')
+    def SaveSimulationData(self, data, PATH):
+        data.to_csv(PATH, encoding='utf-8')
     
     def LossFunction(self, lossfunction = torch.nn.MSELoss()):
         self.lossfunction = lossfunction
@@ -100,7 +105,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
             pred_col = y_pred[:, i]
 
             # Calculate absolute error
-            abs_error = torch.abs(true_col - pred_col)/pred_col
+            abs_error = (torch.abs(true_col - pred_col))/true_col
 
             # Calculate accuracy for this column
             correct = torch.sum(abs_error <= threshold).item()
@@ -109,7 +114,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
         return acc_rates
 
-    def Train(self, epochs = 100):
+    def Train(self, epochs):
         np.random.seed(self.RANDOM_SEED)
 
         for epoch in range(epochs):
@@ -130,7 +135,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                 test_loss = self.lossfunction(test_preds, self.output_test_data)
                 test_acc = self.AccuracyFunc(y_true = self.output_test_data,
                                             y_pred = test_preds,
-                                            treshold = 0.01)
+                                            threshold = 0.01)
                 
                 dfmetrices = pd.DataFrame({'Epoch': epoch, 'Lr': [self.optimizer.param_groups[0]['lr']],
                                            'Theta1Accuracy': test_acc[0], 'Theta2Accuracy': test_acc[1],
@@ -138,21 +143,21 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                            'TrainLoss': loss, 'TestLoss': test_loss})
                 self.metricesbyepochs = pd.concat([self.metricesbyepochs, dfmetrices], axis = 0)
             
-            if epoch % 100 == 0:
+            if epoch % 50 == 0:
                 print(f"Epoch: {epoch} | Loss: {loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Test Loss: {test_loss:.5f}")
 
     def PoseByAxis(self, theta1_true, theta1_pred, theta2_true, theta2_pred):
-        x1_true =  self.DpModel.L1*np.sin(theta1_true)
-        y1_true = -self.DpModel.L1*np.cos(theta1_true)
+        x1_true =  self.DP.L1*np.sin(theta1_true)
+        y1_true = -self.DP.L1*np.cos(theta1_true)
 
-        x2_true = self.DpModel.L2*np.sin(theta2_true) + x1_true
-        y2_true = -self.DpModel.L2*np.cos(theta2_true) + y1_true
+        x2_true = self.DP.L2*np.sin(theta2_true) + x1_true
+        y2_true = -self.DP.L2*np.cos(theta2_true) + y1_true
 
-        x1_pred = self.DpModel.L1*np.sin(theta1_pred)
-        y1_pred = -self.DpModel.L1*np.cos(theta1_pred)
+        x1_pred = self.DP.L1*np.sin(theta1_pred)
+        y1_pred = -self.DP.L1*np.cos(theta1_pred)
 
-        x2_pred = self.DpModel.L2*np.sin(theta2_pred) + x1_pred
-        y2_pred = -self.DpModel.L2*np.cos(theta2_pred) + y1_pred
+        x2_pred = self.DP.L2*np.sin(theta2_pred) + x1_pred
+        y2_pred = -self.DP.L2*np.cos(theta2_pred) + y1_pred
 
         return x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred
 
@@ -188,14 +193,16 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                     })
             
             self.prediction_dataframe = pd.concat([self.prediction_dataframe, pred_df], axis = 1)
-            self.SaveSimulationData(data = self.prediction_dataframe, filename = './DoublePedulum/Dataset/NNModelEval.csv')
+
+            #PATH
+            self.SaveSimulationData(data = self.prediction_dataframe, PATH = f'./DoublePedulum/Dataset/NNModelEvaluation{self.is_noisy}.csv')
+            self.SaveModel(PATH = f'./DoublePedulum/TrainedModels/DPNNModel{self.is_noisy}.pth')
         
     def forward(self, x):
         return self.model(x)
     
-    def SaveModel(self, filename):
-        with open(filename, 'wb') as file:
-            pickle.dump(self.model, file)
+    def SaveModel(self, PATH):
+        torch.save(self.model, PATH)
 
     def DataPlots(self):
 
@@ -230,13 +237,14 @@ class DoublePendulumnNNModel(torch.nn.Module):
         Omega2Accuracy = self.metricesbyepochs['Omega2Accuracy']
         
         FigSize = (60,50)
-        dotsize = 6
+        dotsize = 8
+        linewidth = 3
 
-        plt.rc('axes', titlesize=40)        # Controls Axes Title
-        plt.rc('axes', labelsize=30)        # Controls Axes Labels
-        plt.rc('xtick', labelsize=30)       # Controls x Tick Labels
-        plt.rc('ytick', labelsize=30)       # Controls y Tick Labels
-        plt.rc('legend', fontsize=30)       # Controls Legend Font
+        plt.rc('axes', titlesize=50)        # Controls Axes Title
+        plt.rc('axes', labelsize=35)        # Controls Axes Labels
+        plt.rc('xtick', labelsize=35)       # Controls x Tick Labels
+        plt.rc('ytick', labelsize=35)       # Controls y Tick Labels
+        plt.rc('legend', fontsize=35)       # Controls Legend Font
 
         fig1 = plt.figure(figsize = FigSize)
         fig1ax1 = fig1.add_subplot(2,1,1)
@@ -247,15 +255,15 @@ class DoublePendulumnNNModel(torch.nn.Module):
         fig1ax1.set_xlabel('Time (sec)')
         fig1ax1.set_ylabel(r'$\theta_{1}$'u'\xb0' " (deg)")
         fig1ax1.legend(loc = 'upper right')
-        fig1ax1.grid(linestyle='--', linewidth=2)
+        fig1ax1.grid(linestyle='--', linewidth=linewidth)
         fig1ax2.scatter(t_span,Theta2_pred, color = 'red', s=dotsize, label = 'Pred.')
         fig1ax2.scatter(t_span, Theta2, color = 'blue', s=dotsize, label = 'Pred.')
         fig1ax2.set_title("Second Link Angle - "r'$\theta_{2}$', fontweight="bold")
         fig1ax2.set_xlabel('Time (sec)')
         fig1ax2.set_ylabel(r'$\theta_{2}$'u'\xb0'" (deg)")
         fig1ax2.legend(loc = 'upper right')
-        fig1ax2.grid(linestyle='--', linewidth=2)
-        fig1.savefig("./DoublePedulum/NNFigures/Angle Predictions.png")
+        fig1ax2.grid(linestyle='--', linewidth=linewidth)
+        fig1.savefig(f"./DoublePedulum/NNFigures/AnglePredictions{self.is_noisy}.png")
 
         fig2 = plt.figure(figsize = FigSize)
         fig2ax1 = fig2.add_subplot(2,1,1)
@@ -266,15 +274,15 @@ class DoublePendulumnNNModel(torch.nn.Module):
         fig2ax1.set_xlabel('Time (sec)')
         fig2ax1.set_ylabel(r'$\omega_{1}$'" (deg/s)")
         fig2ax1.legend(loc = 'upper right')
-        fig2ax1.grid(linestyle='--', linewidth=2)
+        fig2ax1.grid(linestyle='--', linewidth=linewidth)
         fig2ax2.scatter(t_span, Omega2_pred, color = 'red', s=dotsize, label = 'Pred.')
         fig2ax2.scatter(t_span, Omega2, color = 'blue', s=dotsize, label = 'True')
         fig2ax2.set_title("Second Link Angular Speed - " r'$\omega_{2}$', fontweight="bold")
         fig2ax2.set_xlabel('Time (sec)')
         fig2ax2.set_ylabel(r'$\omega_{2}$'" (deg/s)")
         fig2ax2.legend(loc = 'upper right')
-        fig2ax2.grid(linestyle='--', linewidth=2)
-        fig2.savefig("./DoublePedulum/NNFigures/Omega Predictions.png")
+        fig2ax2.grid(linestyle='--', linewidth=linewidth)
+        fig2.savefig(f"./DoublePedulum/NNFigures/OmegaPredictions{self.is_noisy}.png")
 
         fig3 = plt.figure(figsize = FigSize)
         fig3ax1 = fig3.add_subplot(2,1,1)
@@ -284,7 +292,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         fig3ax1.set_title('First Link Position - X Axis', fontweight="bold")
         fig3ax1.set_xlabel('Time (sec)')
         fig3ax1.set_ylabel('x (m)')
-        fig3ax1.grid(linestyle='--', linewidth=2)
+        fig3ax1.grid(linestyle='--', linewidth=linewidth)
         fig3ax1.legend(loc = 'upper right')
         fig3ax2.scatter(t_span, y1_true, color = 'blue', s=dotsize, label = 'True')
         fig3ax2.scatter(t_span, y1_pred, color = 'red', s=dotsize, label = 'Pred.')
@@ -292,8 +300,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
         fig3ax2.set_xlabel('Time (sec)')
         fig3ax2.set_ylabel('y (m)')
         fig3ax2.legend(loc = 'upper right')
-        fig3ax2.grid(linestyle='--', linewidth=2)
-        fig3.savefig("./DoublePedulum/NNFigures/First Link Pose.png")
+        fig3ax2.grid(linestyle='--', linewidth=linewidth)
+        fig3.savefig(f"./DoublePedulum/NNFigures/FirstLinkPose{self.is_noisy}.png")
 
         fig4 = plt.figure(figsize = FigSize)
         fig4ax1 = fig4.add_subplot(2,1,1)
@@ -304,79 +312,78 @@ class DoublePendulumnNNModel(torch.nn.Module):
         fig4ax1.set_xlabel('Time (sec)')
         fig4ax1.set_ylabel('x (m)')
         fig4ax1.legend(loc = 'upper right')
-        fig4ax1.grid(linestyle='--', linewidth=2)
+        fig4ax1.grid(linestyle='--', linewidth=linewidth)
         fig4ax2.scatter(t_span, y2_true, color = 'blue', s=dotsize, label = 'True')
         fig4ax2.scatter(t_span, y2_pred, color = 'red', s=dotsize, label = 'Pred.')
         fig4ax2.set_title('Second Link Position - Y Axis', fontweight="bold")
         fig4ax2.set_xlabel('Time (sec)')
         fig4ax2.set_ylabel('y (m)')
         fig4ax2.legend(loc = 'upper right')
-        fig4ax2.grid(linestyle='--', linewidth=2)
-        fig4.savefig("./DoublePedulum/NNFigures/Second Link Pose.png")
+        fig4ax2.grid(linestyle='--', linewidth=linewidth)
+        fig4.savefig(f"./DoublePedulum/NNFigures/SecondLinkPose{self.is_noisy}.png")
 
         fig5 = plt.figure(figsize = FigSize)
         fig5ax1 = fig5.add_subplot(3,1,1)
         fig5ax2 = fig5.add_subplot(3,1,2)
         fig5ax3 = fig5.add_subplot(3,1,3)
-        fig5ax1.plot(epochs, TestLoss, color = 'blue', label = 'Test Loss', )
+        fig5ax1.plot(epochs, TestLoss, color = 'blue', label = 'Test Loss', linewidth=linewidth)
         fig5ax1.set_title('Test Loss by Epoch', fontweight="bold")
         fig5ax1.set_xlabel('Epoch')
         fig5ax1.set_ylabel('Loss')
         fig5ax1.legend(loc = 'upper right')
-        fig5ax1.grid(linestyle='--', linewidth=2)
-        fig5ax2.plot(epochs, TrainLoss, color = 'blue', label = 'Train Loss')
+        fig5ax1.grid(linestyle='--', linewidth=linewidth)
+        fig5ax2.plot(epochs, TrainLoss, color = 'blue', label = 'Train Loss', linewidth=linewidth)
         fig5ax2.set_title('Train Loss by Epoch', fontweight="bold")
         fig5ax2.set_xlabel('Epoch')
         fig5ax2.set_ylabel('Loss')
         fig5ax2.legend(loc = 'upper right')
-        fig5ax2.grid(linestyle='--', linewidth=2)
-        fig5ax3.plot(epochs, lr, color = 'blue', label = 'Lr')
+        fig5ax2.grid(linestyle='--', linewidth=linewidth)
+        fig5ax3.plot(epochs, lr, color = 'blue', label = 'Lr', linewidth=linewidth)
         fig5ax3.set_title('Learning Rate by Epoch', fontweight="bold")
         fig5ax3.set_xlabel('Epoch')
         fig5ax3.set_ylabel('Lr')
         fig5ax3.legend(loc = 'upper right')
-        fig5ax3.grid(linestyle='--', linewidth=2)
-        fig5.savefig("./DoublePedulum/NNFigures/Loss & Learning Rate.png")
+        fig5ax3.grid(linestyle='--', linewidth=linewidth)
+        fig5.savefig(f"./DoublePedulum/NNFigures/Loss&LearningRate{self.is_noisy}.png")
 
         fig6 = plt.figure(figsize = FigSize)
         fig6ax1 = fig6.add_subplot(2,1,1)
         fig6ax2 = fig6.add_subplot(2,1,2)
-        fig6ax1.plot(epochs, Theta1Accuracy, color = 'blue', label = 'Acc. Rate (%)')
+        fig6ax1.plot(epochs, Theta1Accuracy, color = 'blue', label = 'Acc. Rate (%)', linewidth=linewidth)
         fig6ax1.set_title('Accuracy Rate - 'r'$\theta_{1}$'u'\xb0' , fontweight="bold")
         fig6ax1.set_xlabel('Epoch')
         fig6ax1.set_ylabel('Accuracy (%)')
         fig6ax1.legend(loc = 'upper right')
-        fig6ax1.grid(linestyle='--', linewidth=2)
-        fig6ax2.plot(epochs, Theta2Accuracy, color = 'blue', label = 'Accuracy Rate (%)')
+        fig6ax1.grid(linestyle='--', linewidth=linewidth)
+        fig6ax2.plot(epochs, Theta2Accuracy, color = 'blue', label = 'Accuracy Rate (%)', linewidth=linewidth)
         fig6ax2.set_title('Accuracy Rate - 'r'$\theta_{2}$'u'\xb0' , fontweight="bold")
         fig6ax2.set_xlabel('Epoch')
         fig6ax2.set_ylabel('Accuracy (%)')
         fig6ax2.legend(loc = 'upper right')
-        fig6ax2.grid(linestyle='--', linewidth=2)
-        fig6.savefig("./DoublePedulum/NNFigures/Theta Accuracy.png")
+        fig6ax2.grid(linestyle='--', linewidth=linewidth)
+        fig6.savefig(f"./DoublePedulum/NNFigures/ThetaAccuracy{self.is_noisy}.png")
 
         fig7 = plt.figure(figsize = FigSize)
         fig7ax1 = fig7.add_subplot(2,1,1)
         fig7ax2 = fig7.add_subplot(2,1,2)
-        fig7ax1.plot(epochs, Omega1Accuracy, color = 'blue', label = 'Accuracy Rate (%)')
+        fig7ax1.plot(epochs, Omega1Accuracy, color = 'blue', label = 'Accuracy Rate (%)', linewidth=linewidth)
         fig7ax1.set_title('Accuracy Rate - 'r'$\omega_{1}$'u'\xb0', fontweight="bold")
         fig7ax1.set_xlabel('Epoch')
         fig7ax1.set_ylabel('Accuracy (%)')
         fig7ax1.legend(loc = 'upper right')
-        fig7ax1.grid(linestyle='--', linewidth=2)
-        fig7ax2.plot(epochs, Omega2Accuracy, color = 'blue', label = 'Accuracy Rate (%)')
+        fig7ax1.grid(linestyle='--', linewidth=linewidth)
+        fig7ax2.plot(epochs, Omega2Accuracy, color = 'blue', label = 'Accuracy Rate (%)', linewidth = linewidth)
         fig7ax2.set_title('Accuracy Rate - 'r'$\omega_{2}$'u'\xb0' , fontweight="bold")
         fig7ax2.set_xlabel('Epoch')
         fig7ax2.set_ylabel('Accuracy (%)')
         fig7ax2.legend(loc = 'upper right')
-        fig7ax2.grid(linestyle='--', linewidth=2)
-        fig7.savefig("./DoublePedulum/NNFigures/Omega Accuracy.png")
+        fig7ax2.grid(linestyle='--', linewidth=linewidth)
+        fig7.savefig(f"./DoublePedulum/NNFigures/OmegaAccuracy{self.is_noisy}.png")
 
 DpNNModel = DoublePendulumnNNModel()
 DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 1, dt = 0.001, noisy = False)
 DpNNModel.LossFunction()
 DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
-DpNNModel.Train(epochs = 10)
+DpNNModel.Train(epochs = 1000)
 DpNNModel.ModelEvaluation()
 DpNNModel.DataPlots()
-DpNNModel.SaveModel(filename = './DoublePedulum/TrainedModels/DPNNModelWithoutNoise.pkl')
