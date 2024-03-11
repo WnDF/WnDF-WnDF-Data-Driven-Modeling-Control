@@ -90,20 +90,16 @@ class DoublePendulumSS:
         theta1, theta2 = y[0], y[1]
         omega1, omega2 = y[2], y[3]
 
-        theta1_dot, theta2_dot = self.equations_of_motion(t, y)[:2]
-        omega1_dot, omega2_dot = self.equations_of_motion(t, y)[2:]
-        
-        parameters = [theta1, theta2, omega1, omega2, theta1_dot, theta2_dot, omega1_dot, omega2_dot]
+        parameters = [theta1, theta2, omega1, omega2]
 
         if self.noisy:  # Add noise if noisy flag is True
             # Add noise to each parameter using Noisy_Data_Generation function
             for i in range(len(parameters)):
                 parameters[i] = self.Noisy_Data_Generation(parameters[i])
 
-        df = pd.DataFrame({'Time': t, 'Theta1': parameters[0], 'Theta2': parameters[1],
-                       'Omega1': parameters[2], 'Omega2': parameters[3],
-                       'Theta1_dot': parameters[4], 'Theta2_dot': parameters[5],
-                       'Omega1_dot': parameters[6], 'Omega2_dot': parameters[7]})
+        df = pd.DataFrame({'Time': t, 
+                           'Theta1': parameters[0], 'Theta2': parameters[1],
+                            'Omega1': parameters[2], 'Omega2': parameters[3]})
         return df
 
     def plot_outputs(self, df):
@@ -121,11 +117,12 @@ class DoublePendulumSS:
 
 # Example usage:
 if __name__ == "__main__":
-    double_pendulum = DoublePendulumSS(m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy = True)  # Set parameters
+    double_pendulum = DoublePendulumSS(m1=0.2704, m2=0.2056, cg1=0.191, cg2=0.1621, L1=0.2667, L2=0.2667, I1=0.003, I2=0.0011, g=9.81, noisy = False)  # Set parameters
 
     y0 = [np.pi+0.3, np.pi-0.5, 0, 0]
-    t_span = (0, 10)
-    t_eval = np.arange(0, 10, 0.001)
+    t_stop = 4
+    t_span = (0, t_stop)
+    t_eval = np.arange(0, t_stop, 0.001)
 
     df = double_pendulum.simulate(y0, t_span, t_eval)
     print(df)
