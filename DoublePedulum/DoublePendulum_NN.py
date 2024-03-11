@@ -54,6 +54,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.DP = dp.DoublePendulumSS(m1, m2, cg1, cg2, L1, L2, I1, I2, g, noisy)
         np.random.seed(self.RANDOM_SEED)
 
+        dataset_dataframe = pd.DataFrame()
+
         for i in range(1, sim_step_size + 1):
 
             theta1_init = 180.0*np.random.rand()
@@ -68,15 +70,23 @@ class DoublePendulumnNNModel(torch.nn.Module):
             t_eval = np.arange(0, t_stop, dt)
 
             df = self.DP.simulate(state, t_span, t_eval)
-            self.dataset_dataframe = pd.concat([self.dataset_dataframe, df], axis = 0)
+            dataset_dataframe = pd.concat([dataset_dataframe, df], axis = 0)
+        
+        dataset_dataframe = dataset_dataframe.reset_index(drop=True)
 
-        input_data = np.array(self.dataset_dataframe[['Theta1_dot', 'Theta2_dot', 'Omega1_dot', 'Omega2_dot']])
-        output_data = np.array(self.dataset_dataframe[['Theta1', 'Theta2', 'Omega1', 'Omega2']])
-        timespan = np.array(self.dataset_dataframe[['Time']])
+        input_data = dataset_dataframe[['Theta1', 'Theta2', 'Omega1', 'Omega2']].loc[0:dataset_dataframe.shape[0]-2].reset_index(drop = True)
+        output_data = dataset_dataframe[['Theta1', 'Theta2', 'Omega1', 'Omega2']].loc[1:dataset_dataframe.shape[0]-1].reset_index(drop = True)
+        timespan = dataset_dataframe[['Time']].loc[0:dataset_dataframe.shape[0]-2].reset_index(drop = True)
 
-        input_data = torch.from_numpy(input_data).type(torch.float)
-        output_data = torch.from_numpy(output_data).type(torch.float)
-        timespan = torch.from_numpy(timespan).type(torch.float)
+        df_input_output = pd.DataFrame({'Time': timespan['Time'], 
+                                        'Theta1 (t)': input_data['Theta1'], 'Theta2 (t)': input_data['Theta2'], 'Omega1 (t)': input_data['Omega1'], 'Omega2 (t)': input_data['Omega2'],
+                                        'Theta1 (t + dt)':output_data['Theta1'], 'Theta2 (t+dt)': output_data['Theta2'], 'Omega1 (t + dt)': output_data['Omega1'], 'Omega2 (t + dt)': output_data['Omega2']})  
+        
+        self.dataset_dataframe = pd.concat([self.dataset_dataframe, df_input_output], axis = 1)
+
+        input_data = torch.from_numpy(np.array(input_data)).type(torch.float)
+        output_data = torch.from_numpy(np.array(output_data)).type(torch.float)
+        timespan = torch.from_numpy(np.array(timespan)).type(torch.float)
 
         if split:
             self.input_train_data, self.input_test_data, self.output_train_data, self.output_test_data, self.train_timespan_data, self.test_timespan_data = train_test_split(input_data, 
@@ -146,7 +156,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                 self.metricesbyepochs = pd.concat([self.metricesbyepochs, dfmetrices], axis = 0)
             
             if epoch % 50 == 0:
-                print(f"Epoch: {epoch} | Loss: {loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Test Loss: {test_loss:.5f}")
+                print(f"Epoch: {epoch} | Loss: {loss:.5f} | Test Loss: {test_loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Omega1Acc: {test_acc[2]:.2f}% | Omega2Acc: {test_acc[3]:.2f}%")
 
     def PoseByAxis(self, theta1_true = list(), theta1_pred = list(), theta2_true = list(), theta2_pred = list()):
         x1_true =  self.DP.L1*np.sin(theta1_true)
@@ -383,7 +393,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
 if __name__ == "__main__":
     DpNNModel = DoublePendulumnNNModel(RANDOM_SEED = 42)
-    DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 1, dt = 0.001, noisy = False, split = True)
+    DpNNModel.DataGeneration(t_stop = 15, sim_step_size = 1, dt = 0.001, noisy = False, split = True)
     DpNNModel.LossFunction(lossfunction = torch.nn.MSELoss())
     DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
     DpNNModel.Train(epochs = 10)
