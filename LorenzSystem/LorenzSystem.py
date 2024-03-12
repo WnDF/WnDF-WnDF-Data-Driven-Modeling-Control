@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 class LorenzSystem:
-    def __init__(self, sigma=10, rho=28, beta=8/3, noisy=False):
+    def __init__(self, sigma = 10, rho = 28, beta = 8/3, noisy = False):
         self.sigma = sigma
         self.rho = rho
         self.beta = beta

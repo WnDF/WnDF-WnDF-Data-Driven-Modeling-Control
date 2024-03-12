@@ -57,7 +57,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         else:
             self.is_noisy = '(Noise = Normal)'
         
-        self.DP = dp.DoublePendulumSS(m1, m2, cg1, cg2, L1, L2, I1, I2, g, noisy)
+        self.DP = dp.DoublePendulumSS(m1 = m1, m2 = m2, cg1 = cg1, cg2 = cg2, L1 = L1, L2 = L2, I1 = I1, I2 = I2, g = g, noisy = noisy)
         np.random.seed(self.RANDOM_SEED)
 
         dataset_dataframe = pd.DataFrame()
@@ -136,8 +136,6 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
             y_preds = self.model(self.input_train_data)
             loss = self.lossfunction(y_preds, self.output_train_data)
-            accuracy = self.AccuracyFunc(y_true = self.output_train_data, 
-                                         y_pred = y_preds)
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -160,6 +158,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
             if epoch % 50 == 0:
                 print(f"Epoch: {epoch} | Loss: {loss:.5f} | Test Loss: {test_loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Omega1Acc: {test_acc[2]:.2f}% | Omega2Acc: {test_acc[3]:.2f}%")
 
+        self.SaveModel(PATH = f'./DoublePedulum/TrainedModels/DPNNModel{self.is_noisy}.pth')
+        
     def PoseByAxis(self, theta1_true = list(), theta1_pred = list(), theta2_true = list(), theta2_pred = list()):
         x1_true =  self.DP.L1*np.sin(theta1_true)
         y1_true = -self.DP.L1*np.cos(theta1_true)
@@ -213,7 +213,6 @@ class DoublePendulumnNNModel(torch.nn.Module):
             self.prediction_dataframe = pd.concat([self.prediction_dataframe, pred_df], axis = 1)
 
             self.SaveSimulationData(data = self.prediction_dataframe, PATH = f'./DoublePedulum/Dataset/NNModelEvaluation{is_noisy}.csv')
-            self.SaveModel(PATH = f'./DoublePedulum/TrainedModels/DPNNModel{self.is_noisy}.pth')
         
     def forward(self, x):
         return self.model(x)
