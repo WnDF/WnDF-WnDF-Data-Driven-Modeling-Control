@@ -128,7 +128,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
         return acc_rates
 
-    def Train(self, epochs = int()):
+    def Train(self, epochs = int(), threshold = float()):
         np.random.seed(self.RANDOM_SEED)
 
         for epoch in range(epochs):
@@ -147,7 +147,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                 test_loss = self.lossfunction(test_preds, self.output_test_data)
                 test_acc = self.AccuracyFunc(y_true = self.output_test_data,
                                             y_pred = test_preds,
-                                            threshold = 0.01)
+                                            threshold = threshold)
                 
                 dfmetrices = pd.DataFrame({'Epoch': epoch, 'Lr': [self.optimizer.param_groups[0]['lr']],
                                            'Theta1Accuracy': test_acc[0], 'Theta2Accuracy': test_acc[1],
@@ -155,7 +155,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                            'TrainLoss': loss, 'TestLoss': test_loss})
                 self.metricesbyepochs = pd.concat([self.metricesbyepochs, dfmetrices], axis = 0)
             
-            if epoch % 50 == 0:
+            if epoch % 10 == 0:
                 print(f"Epoch: {epoch} | Loss: {loss:.5f} | Test Loss: {test_loss:.5f} | Theta1Acc: {test_acc[0]:.2f}% | Theta2Acc: {test_acc[1]:.2f}% | Omega1Acc: {test_acc[2]:.2f}% | Omega2Acc: {test_acc[3]:.2f}%")
 
         self.SaveModel(PATH = f'./DoublePedulum/TrainedModels/DPNNModel{self.is_noisy}.pth')
@@ -175,7 +175,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
         return x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred
 
-    def ModelEvaluation(self, noisy, is_traning_data):
+    def ModelEvaluation(self, noisy, is_traning_data, treshold):
 
         self.model.eval()
 
@@ -211,6 +211,13 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                     })
             
             self.prediction_dataframe = pd.concat([self.prediction_dataframe, pred_df], axis = 1)
+            
+            Theta1Accuracy = self.AccuracyFunc(y_pred = Theta1_pred, y_true = Theta1, threshold = treshold)
+            Theta2Accuracy = self.AccuracyFunc(y_pred = Theta2_pred, y_true = Theta2, threshold = treshold)
+            Omega11Accuracy = self.AccuracyFunc(y_pred = Omega1_pred, y_true = Omega1, threshold = treshold)
+            Omega2Accuracy = self.AccuracyFunc(y_pred = Omega2_pred, y_true = Omega2, threshold = treshold)
+
+            print(f"Validation Result ------->\n Theta1 Accuracy: {Theta1Accuracy}\n Theta2 Accuracy: {Theta2Accuracy}\n Omega1 Accuracy: {Omega11Accuracy}\n Omega2 Accuracy: {Omega2Accuracy}")
 
             self.SaveSimulationData(data = self.prediction_dataframe, PATH = f'./DoublePedulum/Dataset/NNModelEvaluation{is_noisy}.csv')
         
@@ -401,6 +408,6 @@ if __name__ == "__main__":
     DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 100, dt = 0.001, noisy = False, is_traning_data = True)
     DpNNModel.LossFunction(lossfunction = torch.nn.MSELoss())
     DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
-    DpNNModel.Train(epochs = 10)
-    DpNNModel.ModelEvaluation(noisy = False, is_traning_data = False)
+    DpNNModel.Train(epochs = 100, threshold = 0.05)
+    DpNNModel.ModelEvaluation(noisy = False, is_traning_data = False, threshold = 0.05)
     DpNNModel.DataPlots()
