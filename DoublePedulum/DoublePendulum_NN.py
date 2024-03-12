@@ -19,14 +19,20 @@ class DoublePendulumnNNModel(torch.nn.Module):
         self.DP = None
         self.is_noisy = str()
         self.dataset_dataframe = pd.DataFrame()
-        self.input_train_data = torch.tensor
-        self.input_test_data = torch.tensor
-        self.output_train_data = torch.tensor
-        self.output_test_data = torch.tensor
-        self.train_timespan_data = torch.tensor
-        self.test_timespan_data = torch.tensor
         self.prediction_dataframe = pd.DataFrame()
         self.metricesbyepochs = pd.DataFrame()
+
+        self.input_train_data = torch.tensor
+        self.input_test_data = torch.tensor
+        self.input_validate_data = torch.tensor
+
+        self.output_train_data = torch.tensor
+        self.output_test_data = torch.tensor
+        self.out_validate_data = torch.tensor
+
+        self.train_timespan_data = torch.tensor
+        self.test_timespan_data = torch.tensor
+        self.validate_timespan = torch.tensor
 
         self.model = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=1024),
                                         torch.nn.ReLU(),
@@ -42,7 +48,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                         torch.nn.ReLU(),
                                         torch.nn.Linear(in_features=16, out_features=4))
         
-    def DataGeneration(self, noisy = bool(), split = bool(), t_stop = 10, dt = 0.001, sim_step_size=2, 
+    def DataGeneration(self, noisy = bool(), is_traning_data = bool(), t_stop = 10, dt = 0.001, sim_step_size=1, 
                          m1 = 0.2704, m2 = 0.2056, cg1 = 0.191, cg2 = 0.1621, 
                          L1 = 0.2667, L2 = 0.2667, I1 = 0.003, I2 = 0.0011, g = 9.81):
         
@@ -81,14 +87,13 @@ class DoublePendulumnNNModel(torch.nn.Module):
         df_input_output = pd.DataFrame({'Time': timespan['Time'], 
                                         'Theta1 (t)': input_data['Theta1'], 'Theta2 (t)': input_data['Theta2'], 'Omega1 (t)': input_data['Omega1'], 'Omega2 (t)': input_data['Omega2'],
                                         'Theta1 (t + dt)':output_data['Theta1'], 'Theta2 (t+dt)': output_data['Theta2'], 'Omega1 (t + dt)': output_data['Omega1'], 'Omega2 (t + dt)': output_data['Omega2']})  
-        
-        self.dataset_dataframe = pd.concat([self.dataset_dataframe, df_input_output], axis = 1)
 
         input_data = torch.from_numpy(np.array(input_data)).type(torch.float)
         output_data = torch.from_numpy(np.array(output_data)).type(torch.float)
         timespan = torch.from_numpy(np.array(timespan)).type(torch.float)
 
-        if split:
+        if is_traning_data:
+            self.dataset_dataframe = df_input_output
             self.input_train_data, self.input_test_data, self.output_train_data, self.output_test_data, self.train_timespan_data, self.test_timespan_data = train_test_split(input_data, 
                                                                                                                                                                         output_data, 
                                                                                                                                                                         timespan,
@@ -116,11 +121,8 @@ class DoublePendulumnNNModel(torch.nn.Module):
             true_col = y_true[:, i]
             pred_col = y_pred[:, i]
 
-            # Calculate absolute error
-            abs_error = (torch.abs(true_col - pred_col))/true_col
-
-            # Calculate accuracy for this column
-            correct = torch.sum(abs_error <= threshold).item()
+            abs_error = (torch.abs(true_col - pred_col)/true_col).detach().numpy()
+            correct = np.count_nonzero(abs_error <= threshold)
             acc = (correct / len(true_col)) * 100
             acc_rates.append(acc)
 
@@ -173,20 +175,24 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
         return x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred
 
-    def ModelEvaluation(self):
+    def ModelEvaluation(self, noisy, is_traning_data):
 
         self.model.eval()
 
         with torch.inference_mode():
-            predictions = self.model(self.input_test_data).numpy()
-            self.output_test_data = self.output_test_data.numpy()
-            Theta1 = self.output_test_data[:,0]
+            is_noisy, self.input_validate_data, self.output_validate_data, self.validate_timespan = self.DataGeneration(noisy = noisy, is_traning_data = is_traning_data)
+            
+            predictions = self.model(self.input_validate_data).numpy()
+            self.output_validate_data = self.output_validate_data.numpy()
+            timespan = self.validate_timespan.numpy()[:,0]
+
+            Theta1 = self.output_validate_data[:,0]
             Theta1_pred = predictions[:,0]
-            Theta2 = self.output_test_data[:,1]
+            Theta2 = self.output_validate_data[:,1]
             Theta2_pred = predictions[:,1]
-            Omega1= self.output_test_data[:,2]
+            Omega1= self.output_validate_data[:,2]
             Omega1_pred = predictions[:,2]
-            Omega2 = self.output_test_data[:,3]
+            Omega2 = self.output_validate_data[:,3]
             Omega2_pred = predictions[:,3]
 
             x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred = self.PoseByAxis(theta1_true = Theta1, 
@@ -194,7 +200,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
                                                                                                      theta2_true = Theta2, 
                                                                                                      theta2_pred = Theta2_pred)
 
-            pred_df = pd.DataFrame({'Theta1': Theta1, 'Theta2': Theta2, 
+            pred_df = pd.DataFrame({'Time': timespan, 'Theta1': Theta1, 'Theta2': Theta2, 
                                     'Omega1': Omega1, 'Omega2': Omega2, 
                                     'x1_true': x1_true, 'y1_true': y1_true, 
                                     'x2_true':x2_true, 'y2_true':y2_true ,
@@ -206,7 +212,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
             
             self.prediction_dataframe = pd.concat([self.prediction_dataframe, pred_df], axis = 1)
 
-            self.SaveSimulationData(data = self.prediction_dataframe, PATH = f'./DoublePedulum/Dataset/NNModelEvaluation{self.is_noisy}.csv')
+            self.SaveSimulationData(data = self.prediction_dataframe, PATH = f'./DoublePedulum/Dataset/NNModelEvaluation{is_noisy}.csv')
             self.SaveModel(PATH = f'./DoublePedulum/TrainedModels/DPNNModel{self.is_noisy}.pth')
         
     def forward(self, x):
@@ -235,7 +241,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         x2_pred = self.prediction_dataframe['x2_pred']
         y2_pred =self.prediction_dataframe['y2_pred']
 
-        t_span = self.test_timespan_data
+        t_span = self.validate_timespan
 
         epochs = self.metricesbyepochs['Epoch']
         TrainLoss = self.metricesbyepochs['TrainLoss']
@@ -268,7 +274,7 @@ class DoublePendulumnNNModel(torch.nn.Module):
         fig1ax1.legend(loc = 'upper right')
         fig1ax1.grid(linestyle='--', linewidth=linewidth)
         fig1ax2.scatter(t_span,Theta2_pred, color = 'red', s=dotsize, label = 'Pred.')
-        fig1ax2.scatter(t_span, Theta2, color = 'blue', s=dotsize, label = 'Pred.')
+        fig1ax2.scatter(t_span, Theta2, color = 'blue', s=dotsize, label = 'True.')
         fig1ax2.set_title("Second Link Angle - "r'$\theta_{2}$', fontweight="bold")
         fig1ax2.set_xlabel('Time (sec)')
         fig1ax2.set_ylabel(r'$\theta_{2}$'u'\xb0'" (deg)")
@@ -393,9 +399,9 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
 if __name__ == "__main__":
     DpNNModel = DoublePendulumnNNModel(RANDOM_SEED = 42)
-    DpNNModel.DataGeneration(t_stop = 15, sim_step_size = 1, dt = 0.001, noisy = False, split = True)
+    DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 100, dt = 0.001, noisy = False, is_traning_data = True)
     DpNNModel.LossFunction(lossfunction = torch.nn.MSELoss())
     DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
     DpNNModel.Train(epochs = 10)
-    DpNNModel.ModelEvaluation()
+    DpNNModel.ModelEvaluation(noisy = False, is_traning_data = False)
     DpNNModel.DataPlots()
