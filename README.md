@@ -1,2 +1,2 @@
 # WnDF-Data-Driven-Modeling-Control
-Senior Design Project - Data Driven Modelling &amp; Control: System Identification of Nonlinear Systems
+Senior Design Project - Data Driven Modelling & Control of the Nonlinear Dynamical Systems 
