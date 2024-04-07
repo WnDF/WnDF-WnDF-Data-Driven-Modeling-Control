@@ -6,6 +6,12 @@ from scipy.integrate import solve_ivp
 from sklearn.metrics import mean_squared_error
 import matplotlib.cm as cm
 import warnings
+
+integrator_keywords = {}
+integrator_keywords['rtol'] = 1e-12
+integrator_keywords['method'] = 'LSODA'
+integrator_keywords['atol'] = 1e-12
+
 warnings.filterwarnings("ignore")
 
 class LorenzSystem:
@@ -23,7 +29,7 @@ class LorenzSystem:
         return [dx_dt, dy_dt, dz_dt]
 
     def solve(self, y0, t_span, t_eval):
-        sol = solve_ivp(self.lorenz_equations, t_span, y0, t_eval=t_eval)
+        sol = solve_ivp(self.lorenz_equations, t_span, y0, t_eval=t_eval, **integrator_keywords)
         return sol
 
     def noisy_data_generation(self, x):

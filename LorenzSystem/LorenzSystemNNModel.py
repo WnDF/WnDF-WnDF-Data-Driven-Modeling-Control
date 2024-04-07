@@ -86,7 +86,7 @@ class LorenzSystemNNModel(torch.nn.Module):
                                                                                                                                                                             timespan,
                                                                                                                                                                             test_size=0.2,
                                                                                                                                                                             random_state = np.random.seed(self.RANDOM_SEED))
-            self.SaveSimulationData(data = self.dataset_dataframe, PATH = f'./LorenzSystem/Dataset/LorenzSystemTrainingDataset{self.is_noisy}.csv')
+            self.SaveSimulationData(data = self.dataset_dataframe, PATH = f'./LorenzSystem/Dataset/NNDataset/LorenzSystemTrainingDataset{self.is_noisy}.csv')
         
         return self.is_noisy, input_data, output_data, timespan
         
