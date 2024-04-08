@@ -18,10 +18,10 @@ class LorenzSINDy():
         self.dt = 0.002
 
         #Data generation for train and test
-        self.x_traindata_clean = self.DataGeneration(t_stop = 10, dt = self.dt, noisy = False, iteration = 10, SEED = 50)
-        self.x_testdata_clean = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = False, iteration = 10, SEED = 51)
-        self.x_traindata_noisy = self.DataGeneration(t_stop = 10, dt = self.dt, noisy = True, iteration = 10, SEED = 52)
-        self.x_testdata_noisy = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = True, iteration = 10, SEED = 53)
+        self.x_traindata_clean = self.DataGeneration(t_stop = 10, dt = self.dt, noisy = False, iteration = 10, SEED = 20)
+        self.x_testdata_clean = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = False, iteration = 10, SEED = 21)
+        self.x_traindata_noisy = self.DataGeneration(t_stop = 10, dt = self.dt, noisy = True, iteration = 10, SEED = 22)
+        self.x_testdata_noisy = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = True, iteration = 10, SEED = 23)
 
     def DataGeneration(self, SEED, noisy, t_stop = 10, dt = 0.002, iteration = 1):
         np.random.seed(SEED)
@@ -62,13 +62,19 @@ class LorenzSINDy():
             coefs.append(model.coefficients())
         
         #Plots RMSE over changing lambda
-        x_test_clean = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = False, iteration = 1, SEED = 51)[['X', 'Y', 'Z']].values
-        t_test = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = False, iteration = 1, SEED = 51)[['Time']].values.flatten()
+        data = self.DataGeneration(t_stop = 15, dt = self.dt, noisy = False, iteration = 1, SEED = 51)
+        x_test_clean = data[['X', 'Y', 'Z']].values
+        t_test = data[['Time']].values.flatten()
 
         self.HyperparameterPlot(coefs, sparse_regression_optimizer, model, 
                     threshold_scan, x_test_clean, t_test)
         
     def DifferentiatorEffect(self):
+        x_train_noisy = self.DataGeneration(t_stop = 10, dt = self.dt, noisy = True, iteration = 1, SEED = 20)[['X', 'Y', 'Z']].values
+        self.DifferentiatorPlot(x_train_noisy, self.dt, ps.FiniteDifference()._differentiate, diff_name = "Finite Difference")
+        self.DifferentiatorPlot(x_train_noisy, self.dt, ps.SmoothedFiniteDifference()._differentiate, diff_name = "SmoothedFiniteDifference") 
+
+    def EnsembleEffect(self):
         pass
     
     def SaveSimulationData(self, data = pd.DataFrame(), PATH = str()):
@@ -96,7 +102,33 @@ class LorenzSINDy():
         plt.grid(True)
         plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/HyperparameterEffect.png")
         plt.show()
+
+    def DifferentiatorPlot(self, x, dt, deriv, diff_name):
+        plt.figure(figsize=(30, 8))
+        for i in range(3):
+            plt.subplot(1, 3, i + 1)
+            plt.plot(x[:, i], label = self.feature_names[i])
+            plt.grid(True)
+            plt.title(f"{diff_name} - {self.feature_names[i]} Value ", fontsize = 20)
+            plt.xlabel("t", fontsize=24)
+            plt.xticks(fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.legend(fontsize=18)
+        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/{diff_name} - xyz.png")
+        x_dot = deriv(x, t=dt)
+        plt.figure(figsize=(30, 8))
+        for i in range(3):
+            plt.subplot(1, 3, i + 1)
+            plt.plot(x_dot[:, i], label=r"$\dot{" + self.feature_names[i] + "}$")
+            plt.grid(True)
+            plt.title(f"{diff_name} - $\\dot{{{self.feature_names[i]}}}$ Value", fontsize = 20)
+            plt.xlabel("t", fontsize=24)
+            plt.xticks(fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.legend(fontsize=18)
+        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/{diff_name} - xdotydotzdot.png")
     
 if __name__ == "__main__":
     LorenzSys = LorenzSINDy()
     LorenzSys.HyperparameterEffect()
+    #LorenzSys.DifferentiatorEffect()
