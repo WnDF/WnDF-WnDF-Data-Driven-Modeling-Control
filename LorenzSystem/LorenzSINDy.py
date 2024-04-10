@@ -54,6 +54,9 @@ class LorenzSINDy():
             output = lorenz_system.simulate(x0, t_span, t_eval)
             df = pd.concat([df, output], axis=0)
         
+        #TODO 
+        #SaveSimulationData -> Save simulation data results
+
         print("Simulation data generated...\n")
         print("-> DataGeneration Node Executed...")
         return df
@@ -148,7 +151,7 @@ class LorenzSINDy():
         mean_ensemble = np.mean(ensemble_coefs, axis=0)
         std_ensemble = np.std(ensemble_coefs, axis=0)
         print("Plotting Ensembling Effect plot...")
-        self.plot_ensemble_results(model, mean_ensemble, std_ensemble)
+        self.EnsembleEffectPlot(model, mean_ensemble, std_ensemble)
 
         print("-> EnsembleEffect Node Executed...")
     
@@ -210,14 +213,93 @@ class LorenzSINDy():
         
         #self.x_test_sim_noisy = self.model_noisy.simulate(x_test_noisy[0, :], test_timespan.flatten(), integrator = "odeint")
         print("-> ModelTrainEval Node Executed...")
+        
+    def SaveSimulationData(self, data = pd.DataFrame(), PATH = str()):
+        data.to_csv(PATH, encoding='utf-8')
+    
+    def HyperparameterPlot(self, coefs, opt, model, threshold_scan, x_test, t_test):                                                                    
+        dt = t_test[1] - t_test[0]
+        mse = np.zeros(len(threshold_scan))
+        mse_sim = np.zeros(len(threshold_scan))
+        for i in range(len(threshold_scan)):
+            opt.coef_ = coefs[i]
+            mse[i] = model.score(x_test, t=dt, metric = mean_squared_error)
+            x_test_sim = model.simulate(x_test[0, :], t_test, integrator="odeint")
+            if np.any(x_test_sim > 1e4):
+                x_test_sim = 1e4
+            mse_sim[i] = np.sum((x_test - x_test_sim) ** 2)
+        plt.figure(figsize = (15,7))
+        plt.title(r"RMSE Over Changing $\lambda$", fontsize = 15)
+        plt.semilogy(threshold_scan, mse, "bo")
+        plt.semilogy(threshold_scan, mse, "b")
+        plt.ylabel(r"$\dot{X}$ RMSE", fontsize = 12)
+        plt.xlabel(r"$\lambda$", fontsize = 12)
+        plt.xticks(fontsize = 10)
+        plt.yticks(fontsize = 10)
+        plt.grid(True)
+        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/HyperparameterEffect.png")
 
+    def DifferentiatorPlot(self, x, dt, deriv, diff_name):
+        plt.figure(figsize = (35, 10))
+        for i in range(3):
+            plt.subplot(1, 3, i + 1)
+            plt.plot(x[:, i], label = self.feature_names[i])
+            plt.grid(True)
+            plt.title(f"{diff_name} - {self.feature_names[i]} Value ", fontsize = 20)
+            plt.xlabel("t", fontsize=24)
+            plt.xticks(fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.legend(fontsize=18)
+        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/{diff_name} - xyz.png")
+
+        x_dot = deriv(x, t=dt)
+        plt.figure(figsize = (35, 10))
+        for i in range(3):
+            plt.subplot(1, 3, i + 1)
+            plt.plot(x_dot[:, i], label=r"$\dot{" + self.feature_names[i] + "}$")
+            plt.grid(True)
+            plt.title(f"{diff_name} - $\\dot{{{self.feature_names[i]}}}$ Value", fontsize = 20)
+            plt.xlabel("t", fontsize=24)
+            plt.xticks(fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.legend(fontsize=18)
+        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/{diff_name} - xdotydotzdot.png")
+    
+    def EnsembleEffectPlot(self, model, mean_ensemble, std_ensemble):
+        # Plot results
+        xticknames = model.get_feature_names()
+        for i in range(10):
+            xticknames[i] = "$" + xticknames[i] + "$"
+        plt.figure(figsize=(15, 8))
+        colors = ["b", "r", "k"]
+        plt.xlabel("Candidate terms", fontsize = 12)
+        plt.ylabel("Coefficient values", fontsize = 12)
+        for i in range(3):
+            plt.errorbar(
+                range(10),
+                mean_ensemble[i, :],
+                yerr=std_ensemble[i, :],
+                fmt="o",
+                color=colors[i],
+                label=f"Equation for $\\dot{{{self.feature_names[i]}}}$",
+            )
+        ax = plt.gca()
+        plt.grid(True)
+        ax.set_xticks(range(10))
+        plt.xticks(fontsize = 15)
+        plt.yticks(fontsize = 15)
+        ax.set_xticklabels(xticknames, verticalalignment="top")
+        plt.legend(fontsize=18)
+        plt.title("Error Bounds & Coefficient Values with Ensembling", fontsize = 20)
+        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/EnsembleEffect.png")
+    
     def ModelPlots(self):
         print("-> ModelPlots Node Runnig...\n")
         test_timespan = self.x_testdata_clean[['Time']].loc[0:self.x_testdata_clean.shape[0]-2].reset_index(drop = True).values
         x_test_out_clean = self.x_testdata_clean[['X', 'Y', 'Z']].loc[1:self.x_testdata_clean.shape[0]-1].reset_index(drop = True).values
         x_test_out_noisy = self.x_testdata_noisy[['X', 'Y', 'Z']].loc[1:self.x_testdata_noisy.shape[0]-1].reset_index(drop = True).values
 
-        figsize = (40, 12)
+        figsize = (35, 12)
         title_font = 24
         xlabel_font = 20
         ylabel_font = 20
@@ -384,96 +466,19 @@ class LorenzSINDy():
         fig5ax3.grid(linestyle='--')
         fig5.savefig(f"./LorenzSystem/Figures/SINDyFigures/Actual vs Predicted with Smoothed Finite Difference & Ensemble & WeakForm (Noisy Data).png")
 
-        fig6 = plt.figure(figsize = (10, 8))
+        fig6 = plt.figure(figsize = (15, 12))
         ax = fig6.add_subplot(111, projection='3d')
         ax.plot(x_test_out_noisy[:, 0], x_test_out_noisy[:, 1], x_test_out_noisy[:, 2], color='blue', label='Noisy Data')
         ax.plot(self.x_test_sim_noisy_smoothdif_ensemble_weakform[:, 0], self.x_test_sim_noisy_smoothdif_ensemble_weakform[:, 1], self.x_test_sim_noisy_smoothdif_ensemble_weakform[:, 2], color='purple', label='Simulation')
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.legend()
-        ax.set_title('Lorenz Attractor (Noisy Data vs Simulation)')
+        ax.set_xlabel('X', fontsize = 20)
+        ax.set_ylabel('Y', fontsize = 20)
+        ax.set_zlabel('Z', fontsize = 20)
+        ax.legend(loc = 'upper right', fontsize = 18)
+        ax.tick_params(labelsize = 16)
+        ax.set_title('Lorenz Attractor (Noisy Data vs Simulation)', fontsize = 24)
         fig6.savefig(f"./LorenzSystem/Figures/SINDyFigures/Actual vs Predicted Attractor (Noisy Data).png")
 
         print("-> ModelPlots Node Executed...")
-        
-    def SaveSimulationData(self, data = pd.DataFrame(), PATH = str()):
-        data.to_csv(PATH, encoding='utf-8')
-    
-    def HyperparameterPlot(self, coefs, opt, model, threshold_scan, x_test, t_test):                                                                    
-        dt = t_test[1] - t_test[0]
-        mse = np.zeros(len(threshold_scan))
-        mse_sim = np.zeros(len(threshold_scan))
-        for i in range(len(threshold_scan)):
-            opt.coef_ = coefs[i]
-            mse[i] = model.score(x_test, t=dt, metric = mean_squared_error)
-            x_test_sim = model.simulate(x_test[0, :], t_test, integrator="odeint")
-            if np.any(x_test_sim > 1e4):
-                x_test_sim = 1e4
-            mse_sim[i] = np.sum((x_test - x_test_sim) ** 2)
-        plt.figure(figsize = (8,5))
-        plt.title(r"RMSE Over Changing $\lambda$", fontsize = 15)
-        plt.semilogy(threshold_scan, mse, "bo")
-        plt.semilogy(threshold_scan, mse, "b")
-        plt.ylabel(r"$\dot{X}$ RMSE", fontsize = 12)
-        plt.xlabel(r"$\lambda$", fontsize = 12)
-        plt.xticks(fontsize = 10)
-        plt.yticks(fontsize = 10)
-        plt.grid(True)
-        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/HyperparameterEffect.png")
-
-    def DifferentiatorPlot(self, x, dt, deriv, diff_name):
-        plt.figure(figsize = (40, 12))
-        for i in range(3):
-            plt.subplot(1, 3, i + 1)
-            plt.plot(x[:, i], label = self.feature_names[i])
-            plt.grid(True)
-            plt.title(f"{diff_name} - {self.feature_names[i]} Value ", fontsize = 20)
-            plt.xlabel("t", fontsize=24)
-            plt.xticks(fontsize=15)
-            plt.yticks(fontsize=15)
-            plt.legend(fontsize=18)
-        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/{diff_name} - xyz.png")
-        x_dot = deriv(x, t=dt)
-        plt.figure(figsize = (40, 12))
-        for i in range(3):
-            plt.subplot(1, 3, i + 1)
-            plt.plot(x_dot[:, i], label=r"$\dot{" + self.feature_names[i] + "}$")
-            plt.grid(True)
-            plt.title(f"{diff_name} - $\\dot{{{self.feature_names[i]}}}$ Value", fontsize = 20)
-            plt.xlabel("t", fontsize=24)
-            plt.xticks(fontsize=15)
-            plt.yticks(fontsize=15)
-            plt.legend(fontsize=18)
-        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/{diff_name} - xdotydotzdot.png")
-    
-    def plot_ensemble_results(self, model, mean_ensemble, std_ensemble):
-        # Plot results
-        xticknames = model.get_feature_names()
-        for i in range(10):
-            xticknames[i] = "$" + xticknames[i] + "$"
-        plt.figure(figsize=(15, 8))
-        colors = ["b", "r", "k"]
-        plt.xlabel("Candidate terms", fontsize = 12)
-        plt.ylabel("Coefficient values", fontsize = 12)
-        for i in range(3):
-            plt.errorbar(
-                range(10),
-                mean_ensemble[i, :],
-                yerr=std_ensemble[i, :],
-                fmt="o",
-                color=colors[i],
-                label=f"Equation for $\\dot{{{self.feature_names[i]}}}$",
-            )
-        ax = plt.gca()
-        plt.grid(True)
-        ax.set_xticks(range(10))
-        plt.xticks(fontsize = 15)
-        plt.yticks(fontsize = 15)
-        ax.set_xticklabels(xticknames, verticalalignment="top")
-        plt.legend(fontsize=18)
-        plt.title("Error Bounds & Coefficient Values with Ensembling", fontsize = 20)
-        plt.savefig(f"./LorenzSystem/Figures/SINDyFigures/EnsembleEffect.png")
     
 if __name__ == "__main__":
 
