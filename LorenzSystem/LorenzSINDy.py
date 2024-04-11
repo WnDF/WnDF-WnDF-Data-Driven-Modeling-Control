@@ -212,6 +212,12 @@ class LorenzSINDy():
         ).y.T
         
         #self.x_test_sim_noisy = self.model_noisy.simulate(x_test_noisy[0, :], test_timespan.flatten(), integrator = "odeint")
+
+        if __name__ == "__main__":
+            train_dataset_dataframe = pd.concat([self.x_traindata_clean,self.x_traindata_noisy, 
+                                                self.x_testdata_clean, self.x_testdata_noisy], axis = 1)
+            self.SaveSimulationData(data = train_dataset_dataframe, PATH = f'./LorenzSystem/Dataset/SINDyDataset/LorenzTrainingSet.csv')
+
         print("-> ModelTrainEval Node Executed...")
         
     def SaveSimulationData(self, data = pd.DataFrame(), PATH = str()):
@@ -477,6 +483,18 @@ class LorenzSINDy():
         ax.tick_params(labelsize = 16)
         ax.set_title('Lorenz Attractor (Noisy Data vs Simulation)', fontsize = 24)
         fig6.savefig(f"./LorenzSystem/Figures/SINDyFigures/Actual vs Predicted Attractor (Noisy Data).png")
+
+        fig7 = plt.figure(figsize = (15, 12))
+        ax = fig7.add_subplot(111, projection='3d')
+        ax.plot(x_test_out_clean[:, 0], x_test_out_clean[:, 1], x_test_out_clean[:, 2], color='red', label='Clean Data')
+        ax.plot(self.x_test_sim_clean[:, 0], self.x_test_sim_clean[:, 1], self.x_test_sim_clean[:, 2], color='green', label='Simulation')
+        ax.set_xlabel('X', fontsize = 20)
+        ax.set_ylabel('Y', fontsize = 20)
+        ax.set_zlabel('Z', fontsize = 20)
+        ax.legend(loc = 'upper right', fontsize = 18)
+        ax.tick_params(labelsize = 16)
+        ax.set_title('Lorenz Attractor (Clean Data vs Simulation)', fontsize = 24)
+        fig7.savefig(f"./LorenzSystem/Figures/SINDyFigures/Actual vs Predicted Attractor (Clean Data).png") 
 
         print("-> ModelPlots Node Executed...")
     
