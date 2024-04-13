@@ -1,0 +1,28 @@
+self.model = torch.nn.Sequential(torch.nn.Linear(in_features=4, out_features=1024),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(in_features=1024, out_features=512),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(in_features=512, out_features=1024),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(in_features=1024, out_features=512),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(in_features=512, out_features=1024),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(in_features=1024, out_features=4))
+
+Epoch: 0 | Loss: 247.97919 | Test Loss: 217.66632 | Theta1ErrorRate: 93.45% | Theta2ErrorRate: 93.27% | Omega1ErrorRate: 117.21% | Omega2ErrorRate: 100.75%
+Epoch: 10 | Loss: 39.98094 | Test Loss: 25.22658 | Theta1ErrorRate: 152.39% | Theta2ErrorRate: 33.03% | Omega1ErrorRate: 161.79% | Omega2ErrorRate: 73.21%
+Epoch: 20 | Loss: 13.19502 | Test Loss: 14.38838 | Theta1ErrorRate: 106.84% | Theta2ErrorRate: 52.65% | Omega1ErrorRate: 166.27% | Omega2ErrorRate: 45.22%
+Epoch: 30 | Loss: 5.69056 | Test Loss: 5.17433 | Theta1ErrorRate: 63.04% | Theta2ErrorRate: 22.41% | Omega1ErrorRate: 189.21% | Omega2ErrorRate: 39.15%
+Epoch: 40 | Loss: 1.49971 | Test Loss: 1.35968 | Theta1ErrorRate: 34.10% | Theta2ErrorRate: 18.21% | Omega1ErrorRate: 64.55% | Omega2ErrorRate: 25.32%
+Epoch: 50 | Loss: 0.54364 | Test Loss: 0.36935 | Theta1ErrorRate: 16.47% | Theta2ErrorRate: 11.82% | Omega1ErrorRate: 49.58% | Omega2ErrorRate: 13.71%
+Epoch: 60 | Loss: 0.25607 | Test Loss: 0.14411 | Theta1ErrorRate: 8.06% | Theta2ErrorRate: 6.24% | Omega1ErrorRate: 30.92% | Omega2ErrorRate: 14.78%
+Epoch: 70 | Loss: 0.19713 | Test Loss: 0.26976 | Theta1ErrorRate: 8.14% | Theta2ErrorRate: 13.92% | Omega1ErrorRate: 19.94% | Omega2ErrorRate: 26.73%
+Epoch: 80 | Loss: 0.20394 | Test Loss: 0.09226 | Theta1ErrorRate: 5.07% | Theta2ErrorRate: 4.69% | Omega1ErrorRate: 15.94% | Omega2ErrorRate: 14.46%
+Epoch: 90 | Loss: 0.11306 | Test Loss: 0.04307 | Theta1ErrorRate: 3.28% | Theta2ErrorRate: 2.87% | Omega1ErrorRate: 15.29% | Omega2ErrorRate: 7.30%
+
+Validation Result ------->
+ Theta1 ErrorRate: 2.51845
+ Theta2 ErrorRate: 0.48897
+ Omega1 ErrorRate: 6.48334
+ Omega2 ErrorRate: 3.02093
