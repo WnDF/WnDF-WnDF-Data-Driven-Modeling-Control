@@ -1,0 +1,23 @@
+--> NNFTT -> Clean
+Epoch: 0 | Loss: 267.26822 | Test Loss: 253.40924 | x_Error: 96.32% | y_Error: 109.10% | z_Error: 95.98%
+Epoch: 100 | Loss: 1.17971 | Test Loss: 1.15534 | x_Error: 62.65% | y_Error: 62.90% | z_Error: 2.16%
+Epoch: 200 | Loss: 0.29375 | Test Loss: 0.25132 | x_Error: 5.50% | y_Error: 20.69% | z_Error: 1.75%
+Epoch: 300 | Loss: 0.26969 | Test Loss: 0.22733 | x_Error: 5.46% | y_Error: 16.94% | z_Error: 1.58%
+Epoch: 400 | Loss: 0.24792 | Test Loss: 0.20622 | x_Error: 3.91% | y_Error: 7.61% | z_Error: 1.44%
+
+Validation Result ------->
+ X Error Rate: 0.52871
+ Y Error Rate: 1.15749
+ Z Error Rate: 0.15490
+
+--> NNFTT -> Noisy
+Epoch: 0 | Loss: 288.30887 | Test Loss: 274.11081 | x_Error: 138.50% | y_Error: 289.23% | z_Error: 99.97%
+Epoch: 100 | Loss: 0.60838 | Test Loss: 0.60189 | x_Error: 53.03% | y_Error: 70.29% | z_Error: 3.08%
+Epoch: 200 | Loss: 0.15216 | Test Loss: 0.15327 | x_Error: 9.18% | y_Error: 46.54% | z_Error: 2.48%
+Epoch: 300 | Loss: 0.13435 | Test Loss: 0.13597 | x_Error: 8.91% | y_Error: 37.88% | z_Error: 2.38%
+Epoch: 400 | Loss: 0.12631 | Test Loss: 0.12871 | x_Error: 9.20% | y_Error: 34.19% | z_Error: 2.34%
+
+Validation Result ------->
+ X Error Rate: 4.35736
+ Y Error Rate: 16.27966
+ Z Error Rate: 1.0756
