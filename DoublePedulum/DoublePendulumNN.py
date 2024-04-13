@@ -170,12 +170,12 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
         return x1_true, y1_true, x2_true, y2_true, x1_pred, y1_pred, x2_pred, y2_pred
 
-    def ModelEvaluation(self, noisy, is_traning_data):
+    def ModelEvaluation(self, noisy, is_traning_data, sim_step_size):
 
         self.model.eval()
 
         with torch.inference_mode():
-            is_noisy, self.input_validate_data, self.output_validate_data, self.validate_timespan = self.DataGeneration(noisy = noisy, is_traning_data = is_traning_data)
+            is_noisy, self.input_validate_data, self.output_validate_data, self.validate_timespan = self.DataGeneration(noisy = noisy, sim_step_size = sim_step_size, is_traning_data = is_traning_data)
             
             predictions = self.model(self.input_validate_data).numpy()
             self.output_validate_data = self.output_validate_data.numpy()
@@ -397,9 +397,9 @@ class DoublePendulumnNNModel(torch.nn.Module):
 
 if __name__ == "__main__":
     DpNNModel = DoublePendulumnNNModel(RANDOM_SEED = 42)
-    DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 100, dt = 0.001, noisy = False, is_traning_data = True)
+    DpNNModel.DataGeneration(t_stop = 10, sim_step_size = 100, dt = 0.001, noisy = True, is_traning_data = True)
     DpNNModel.LossFunction(lossfunction = torch.nn.MSELoss())
     DpNNModel.Optimizer(optimizer = torch.optim.Adam, lr = 0.001)
     DpNNModel.Train(epochs = 100)
-    DpNNModel.ModelEvaluation(noisy = False, is_traning_data = False)
+    DpNNModel.ModelEvaluation(noisy = True, sim_step_size = 1, is_traning_data = False)
     DpNNModel.DataPlots()
