@@ -77,8 +77,7 @@ class LorenzSystemNNModel(torch.nn.Module):
         if self.is_noisy == '(Noise = Noisy)':
             if not is_traning_data:
                 self.validate_data_not_filtered = dataset_dataframe[['X', 'Y', 'Z']].loc[1:dataset_dataframe.shape[0]-1]
-            self.FFTFilter(data_clean = data_clean, data_noisy = dataset_dataframe, threshold = 50, dt = dt, t_stop = t_stop)
-            
+            self.FFTFilter(data_clean = data_clean, data_noisy = dataset_dataframe, threshold = [5, 5, 40], dt = dt, t_stop = t_stop)
 
         input_data = dataset_dataframe[['X', 'Y', 'Z']].loc[0:dataset_dataframe.shape[0]-2].reset_index(drop = True)
         output_data = dataset_dataframe[['X', 'Y', 'Z']].loc[1:dataset_dataframe.shape[0]-1].reset_index(drop = True)
@@ -223,52 +222,40 @@ class LorenzSystemNNModel(torch.nn.Module):
             plt.legend(loc = 'upper right', fontsize = 15)
             plt.grid(linestyle='--', linewidth=1)
 
-            plt.savefig(f"./LorenzSystem/Figures/NNFigures/DistributionbyFrequency_FFT-{data_noisy.columns[i]}.png")
+            plt.savefig(f"./LorenzSystem/Figures/NNFigures/DistributionbyFrequency_FFT-{data_noisy.columns[i]}-{self.is_noisy}.png")
 
-            indices = PSD > threshold
+            indices = PSD > threshold[i-1]
             PSDclean = PSD * indices
             fhat = indices * fhat
             ffilt = np.fft.ifft(fhat)
 
-            figs, axs = plt.subplots(3, 1, figsize = (40,30))
+            figs, axs = plt.subplots(2, 1, figsize = (22,17))
 
             plt.sca(axs[0])
-            plt.plot(t[:x], f_noisy[:x], color="r", linewidth=3, label="Noisy")
-            plt.plot(t[:x], f_clean[:x], color="k", linewidth=3, label="Clean")
-            plt.xlabel('Time(t)', fontsize = 25)
-            plt.ylabel(f"{data_noisy.columns[i]}", fontsize = 25)
-            plt.xticks(fontsize = 25)
-            plt.yticks(fontsize = 25)
-            plt.title(f"Lorenz Data - {data_noisy.columns[i]}", fontweight="bold", fontsize = 30)
+            plt.plot(t[:x], f_noisy[:x], color="r", linewidth=2, label="Noisy")
+            plt.plot(t[:x], f_clean[:x], color="k", linewidth=2, label="Clean")
+            plt.xlabel('Time(t)', fontsize = 15)
+            plt.ylabel(f"{data_noisy.columns[i]}", fontsize = 15)
+            plt.xticks(fontsize = 15)
+            plt.yticks(fontsize = 15)
+            plt.title(f"Lorenz Data - {data_noisy.columns[i]}", fontweight="bold", fontsize = 20)
             plt.xlim(t[:x].iloc[0], t.iloc[-1])
-            plt.legend(loc = 'upper right', fontsize = 20)
-            plt.grid(linestyle='--', linewidth=2)
+            plt.legend(loc = 'upper right', fontsize = 15)
+            plt.grid(linestyle='--', linewidth=1)
 
             plt.sca(axs[1])
-            plt.plot(t[:x], ffilt[:x], color="c", linewidth=3, label="Filtered")
-            plt.plot(t[:x], f_clean[:x], color="k", linewidth=3, label="Clean")
-            plt.xlabel('Time(t)', fontsize = 25)
-            plt.ylabel(f"{data_noisy.columns[i]}", fontsize = 25)
-            plt.xticks(fontsize = 25)
-            plt.yticks(fontsize = 25)
-            plt.title(f"Lorenz Data - {data_noisy.columns[i]}", fontweight="bold", fontsize = 30)
+            plt.plot(t[:x], ffilt[:x], color="c", linewidth=2, label="Filtered")
+            plt.plot(t[:x], f_clean[:x], color="k", linewidth=2, label="Clean")
+            plt.xlabel('Time(t)', fontsize = 15)
+            plt.ylabel(f"{data_noisy.columns[i]}", fontsize = 15)
+            plt.xticks(fontsize = 15)
+            plt.yticks(fontsize = 15)
+            plt.title(f"Lorenz Data - {data_noisy.columns[i]}", fontweight="bold", fontsize = 20)
             plt.xlim(t[:x].iloc[0], t[:x].iloc[-1])
-            plt.legend(loc = 'upper right', fontsize = 20)
-            plt.grid(linestyle='--', linewidth=2)
+            plt.legend(loc = 'upper right', fontsize = 15)
+            plt.grid(linestyle='--', linewidth=1)
 
-            plt.sca(axs[2])
-            plt.plot(freq[L], PSD[L], color="r", linewidth=3, label="Noisy")
-            plt.plot(freq[L], PSDclean[L], color="c", linewidth=3, label="Filtered")
-            plt.xlabel('Frequency(Hz)', fontsize = 25)
-            plt.ylabel("PSD", fontsize = 25)
-            plt.xticks(fontsize = 25)
-            plt.yticks(fontsize = 25)
-            plt.title(f"PSD Over Frequency Spectrum - {data_noisy.columns[i]}", fontweight="bold", fontsize = 30)
-            plt.xlim(freq[L[0]], freq[L[-1]])
-            plt.legend(loc = 'upper right', fontsize = 20)
-            plt.grid(linestyle='--', linewidth=2)
-
-            plt.savefig(f"./LorenzSystem/Figures/NNFigures/FilteredResult_FFT-{data_noisy.columns[i]}.png")
+            plt.savefig(f"./LorenzSystem/Figures/NNFigures/FilteredResult_FFT-{data_noisy.columns[i]}-{self.is_noisy}.png")
 
             data_noisy[data_noisy.columns[i]] = ffilt
 
@@ -311,10 +298,10 @@ class LorenzSystemNNModel(torch.nn.Module):
         fig1ax2 = fig1.add_subplot(3,1,2)
         fig1ax3 = fig1.add_subplot(3,1,3)
 
-        fig1ax1.plot(t_span, x_pred, color = 'blue', label = 'Pred.', linestyle='--', linewidth=linewidth)
-        fig1ax1.plot(t_span, x, color = 'black', label = 'Act.', linewidth=linewidth)
         if 'x_before_filter' in locals():
             fig1ax1.plot(t_span, x_before_filter, color = 'red', label = 'Noisy', linewidth=linewidth)
+        fig1ax1.plot(t_span, x, color = 'green', label = 'Act.', linewidth=linewidth)
+        fig1ax1.plot(t_span, x_pred, color = 'blue', label = 'Pred.', linestyle='--', linewidth=linewidth)
         fig1ax1.set_title("Lorenz Data - X", fontweight="bold", fontsize = 30)
         fig1ax1.set_xlabel('Time (sec)', fontsize = 25)
         fig1ax1.set_ylabel("x", fontsize = 25)
@@ -322,10 +309,10 @@ class LorenzSystemNNModel(torch.nn.Module):
         fig1ax1.legend(loc = 'upper right', fontsize = 20)
         fig1ax1.grid(linestyle='--', linewidth = 2)
 
-        fig1ax2.plot(t_span, y_pred, color = 'blue', label = 'Pred.', linestyle='--', linewidth=linewidth)
-        fig1ax2.plot(t_span, y, color = 'black', label = 'Act.', linewidth=linewidth)
         if 'y_before_filter' in locals():
             fig1ax2.plot(t_span, y_before_filter, color = 'red', label = 'Noisy', linewidth=linewidth)
+        fig1ax2.plot(t_span, y, color = 'green', label = 'Act.', linewidth=linewidth)
+        fig1ax2.plot(t_span, y_pred, color = 'blue', label = 'Pred.', linestyle='--', linewidth=linewidth)
         fig1ax2.set_title("Lorenz Data - Y", fontweight="bold", fontsize = 30)
         fig1ax2.set_xlabel('Time (sec)', fontsize = 25)
         fig1ax2.set_ylabel("y", fontsize = 25)
@@ -333,10 +320,10 @@ class LorenzSystemNNModel(torch.nn.Module):
         fig1ax2.legend(loc = 'upper right', fontsize = 20)
         fig1ax2.grid(linestyle='--', linewidth = 2)
 
-        fig1ax3.plot(t_span, z_pred, color = 'blue', label = 'Pred.', linestyle='--', linewidth=linewidth)
-        fig1ax3.plot(t_span, z, color = 'black', label = 'Act.', linewidth=linewidth)
         if 'z_before_filter' in locals():
             fig1ax3.plot(t_span, z_before_filter, color = 'red', label = 'Noisy', linewidth=linewidth)
+        fig1ax3.plot(t_span, z, color = 'green', label = 'Act.', linewidth=linewidth)
+        fig1ax3.plot(t_span, z_pred, color = 'blue', label = 'Pred.', linestyle='--', linewidth=linewidth)
         fig1ax3.set_title("Lorenz Data - Z", fontweight="bold", fontsize = 30)
         fig1ax3.set_xlabel('Time (sec)', fontsize = 25)
         fig1ax3.set_ylabel("z", fontsize = 25)
@@ -346,33 +333,25 @@ class LorenzSystemNNModel(torch.nn.Module):
         fig1.savefig(f"./LorenzSystem/Figures/NNFigures/XYZ_FFT-{self.is_noisy}.png")
 
         fig2 = plt.figure(figsize = FigSize)
-        fig2ax1 = fig2.add_subplot(3,1,1)
-        fig2ax2 = fig2.add_subplot(3,1,2)
-        fig2ax3 = fig2.add_subplot(3,1,3)
+        fig2ax1 = fig2.add_subplot(2,1,1)
+        fig2ax2 = fig2.add_subplot(2,1,2)
 
         fig2ax1.plot(epochs, TestLoss, color = 'blue', label = 'Test Loss', linewidth=linewidth)
-        fig2ax1.set_title('Test Loss by Epoch', fontweight="bold", fontsize = 50)
+        fig2ax1.plot(epochs, TrainLoss, color = 'red', label = 'Train Loss', linewidth=linewidth)
+        fig2ax1.set_title('Train/Test Loss by Epoch', fontweight="bold", fontsize = 50)
         fig2ax1.set_xlabel('Epoch', fontsize = 35)
         fig2ax1.set_ylabel('Loss', fontsize = 35)
         fig2ax1.tick_params(labelsize = 35)
         fig2ax1.legend(loc = 'upper right', fontsize = 35)
         fig2ax1.grid(linestyle='--', linewidth=linewidth)
 
-        fig2ax2.plot(epochs, TrainLoss, color = 'blue', label = 'Train Loss', linewidth=linewidth)
-        fig2ax2.set_title('Train Loss by Epoch', fontweight="bold", fontsize = 50)
+        fig2ax2.plot(epochs, lr, color = 'blue', label = 'Lr', linewidth=linewidth)
+        fig2ax2.set_title('Learning Rate by Epoch', fontweight="bold", fontsize = 50)
         fig2ax2.set_xlabel('Epoch', fontsize = 35)
-        fig2ax2.set_ylabel('Loss', fontsize = 35)
+        fig2ax2.set_ylabel('Lr', fontsize = 35)
         fig2ax2.tick_params(labelsize = 35)
         fig2ax2.legend(loc = 'upper right', fontsize = 35)
         fig2ax2.grid(linestyle='--', linewidth=linewidth)
-
-        fig2ax3.plot(epochs, lr, color = 'blue', label = 'Lr', linewidth=linewidth)
-        fig2ax3.set_title('Learning Rate by Epoch', fontweight="bold", fontsize = 50)
-        fig2ax3.set_xlabel('Epoch', fontsize = 35)
-        fig2ax3.set_ylabel('Lr', fontsize = 35)
-        fig2ax3.tick_params(labelsize = 35)
-        fig2ax3.legend(loc = 'upper right', fontsize = 35)
-        fig2ax3.grid(linestyle='--', linewidth=linewidth)
         fig2.savefig(f"./LorenzSystem/Figures/NNFigures/Loss&LearningRate_FFT{self.is_noisy}.png")
 
         fig3 = plt.figure(figsize = FigSize)
@@ -407,10 +386,10 @@ class LorenzSystemNNModel(torch.nn.Module):
 
         fig4 = plt.figure(figsize = (15, 12))
         ax = fig4.add_subplot(111, projection='3d')
-        ax.plot(x, y, z, color='black', label=f'Act.', linewidth = 2)
-        ax.plot(x_pred, y_pred, z_pred, color='blue', label='Pred.', linestyle='--', linewidth = 2)
         if 'x_before_filter' in locals():
             ax.plot(x_before_filter, y_before_filter, z_before_filter, color = 'red', label = 'Noisy', linewidth = 2)
+        ax.plot(x, y, z, color='green', label='Act.', linewidth = 2)
+        ax.plot(x_pred, y_pred, z_pred, color='blue', label='Pred.', linestyle='--', linewidth = 2)
         ax.set_xlabel('X', fontsize = 20)
         ax.set_ylabel('Y', fontsize = 20)
         ax.set_zlabel('Z', fontsize = 20)
