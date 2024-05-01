@@ -79,7 +79,7 @@ class DoublePendulumSS:
     
     def Noisy_Data_Generation(self, x):
         rmse = mean_squared_error(x, np.zeros(x.shape), squared=False)
-        x_noisy = x + np.random.normal(0, rmse / 50.0, x.shape)
+        x_noisy = x + np.random.normal(0, rmse / 20.0, x.shape)
         return x_noisy
 
     def simulate(self, y0, t_span, t_eval):
